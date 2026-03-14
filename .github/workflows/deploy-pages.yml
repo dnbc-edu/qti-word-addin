@@ -1,0 +1,95 @@
+name: Deploy Add-in to GitHub Pages
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build add-in
+        run: npm run build:addin
+
+      - name: Prepare Pages artifact
+        run: |
+          mkdir -p pages
+          cp -R dist-addin/* pages/
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: pages
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    outputs:
+      page_url: ${{ steps.deployment.outputs.page_url }}
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+
+  package_prod_bundle:
+    needs: deploy
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Create production bundle from deployed Pages URL
+        env:
+          ADDIN_BASE_URL: ${{ needs.deploy.outputs.page_url }}
+        run: npm run package:addin:prod
+
+      - name: Verify production manifest URLs
+        env:
+          ADDIN_BASE_URL: ${{ needs.deploy.outputs.page_url }}
+        run: npm run verify:prod:manifest
+
+      - name: Upload production bundle artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: qti-word-addin-release-prod-from-pages
+          path: |
+            release/qti-word-addin-release-prod.zip
+            release/qti-word-addin-release-prod/

@@ -1,0 +1,50 @@
+name: Create Production Bundle
+
+on:
+  workflow_dispatch:
+    inputs:
+      addin_base_url:
+        description: "Public base URL (for example: https://username.github.io/repo)"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run checks
+        run: npm run check:all
+
+      - name: Build production bundle
+        env:
+          ADDIN_BASE_URL: ${{ inputs.addin_base_url }}
+        run: npm run package:addin:prod
+
+      - name: Verify production manifest URLs
+        env:
+          ADDIN_BASE_URL: ${{ inputs.addin_base_url }}
+        run: npm run verify:prod:manifest
+
+      - name: Upload production artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: qti-word-addin-release-prod
+          path: |
+            release/qti-word-addin-release-prod.zip
+            release/qti-word-addin-release-prod/

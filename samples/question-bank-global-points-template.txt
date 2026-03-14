@@ -1,0 +1,26 @@
+Title: SUPPORTED FORMATS SAMPLE
+Points: 2
+
+1. What are found in the nucleus of an atom?
+a. Electrons and Protons
+b. Protons and Neutrons {{ANS}}
+c. Cations and Anions
+d. Electrons and Neutrons
+
+2) What is the negatively charged particle of an atom? (Points: 3)
+A) [x] Electrons
+B) [ ] Protons
+C) [ ] Neutron
+D) [ ] Molecule
+
+3 What is the positively charged particle of an atom?
+- [ ] Electrons
+- [x] Protons
+- [ ] Neutron
+- [ ] Molecule
+
+What is the particle of an atom that has no electrical charge? (Points: 1.5)
+Electrons
+Protons
+Neutron {{ANS}}
+Molecule

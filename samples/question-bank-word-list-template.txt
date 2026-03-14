@@ -1,0 +1,14 @@
+Title: WORD NUMBERED LIST FORMAT SAMPLE
+Points: 2
+
+1 The dielectric material of optical fiber surrounding the core
+A [x] Cladding
+B [ ] Armor
+C [ ] Shield
+D [ ] Cover
+
+2 Circularly polarized antenna is the (Points: 1.5)
+A [ ] parabolic reflector
+B helical {{ANS}}
+C [ ] Yagi-uda
+D [ ] small circular loop

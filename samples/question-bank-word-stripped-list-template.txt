@@ -1,0 +1,20 @@
+Title: WORD STRIPPED LIST SAMPLE
+Points: 2
+
+What are found in the nucleus of an atom?
+Electrons and Protons
+Protons and Neutrons {{ANS}}
+Cations and Anions
+Electrons and Neutrons
+
+What is the negatively charged particle of an atom?
+Electrons {{ANS}}
+Protons
+Neutron
+Molecule
+
+What is the positively charged particle of an atom? (Points: 3)
+Electrons
+Protons {{ANS}}
+Neutron
+Molecule

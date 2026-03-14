@@ -1,0 +1,36 @@
+{
+  "name": "qti-word-addin-mvp",
+  "version": "0.1.0",
+  "private": true,
+  "license": "MIT",
+  "author": "Dhon Niño B. Canela",
+  "type": "module",
+  "description": "MVP QTI package generator intended for Word add-in integration",
+  "scripts": {
+    "download:xsds": "node scripts/download-xsds.js",
+    "check:mixed-marker": "node scripts/assert-mixed-marker-fails.js",
+    "check:all": "npm run demo && npm run validate:demo && npm run check:mixed-marker",
+    "certs:install": "office-addin-dev-certs install",
+    "generate:qti": "node scripts/generate-qti.js",
+    "validate:qti": "node scripts/validate-qti.js",
+    "validate:demo": "node scripts/validate-qti.js --zip dist/COMMUNICATIONS-ENG-EXAM-1-qti.zip --version 1p2",
+    "demo": "node scripts/generate-qti.js --input samples/question-bank-template.txt --output dist/COMMUNICATIONS-ENG-EXAM-1-qti.zip",
+    "sideload:word": "node scripts/sideload-manifest.js",
+    "stop:dev": "node scripts/stop-dev-server.js",
+    "dev:addin": "vite --config addin/vite.config.js",
+    "dev:word": "npm run sideload:word && npm run dev:addin",
+    "dev:word:open": "npm run sideload:word && open -a 'Microsoft Word' && npm run dev:addin",
+    "dev:word:clean": "npm run stop:dev && npm run dev:word:open",
+    "build:addin": "vite build --config addin/vite.config.js",
+    "package:addin": "npm run build:addin && node scripts/package-addin.js",
+    "package:addin:prod": "npm run build:addin && node scripts/package-addin.js --prod",
+    "verify:prod:manifest": "node scripts/verify-prod-manifest.js"
+  },
+  "dependencies": {
+    "jszip": "^3.10.1"
+  },
+  "devDependencies": {
+    "office-addin-dev-certs": "^2.0.6",
+    "vite": "^5.4.10"
+  }
+}

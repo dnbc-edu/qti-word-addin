@@ -1,0 +1,8 @@
+Title: MIXED MARKER NEGATIVE SAMPLE
+Points: 2
+
+1) Circularly polarized antenna is the
+A) [x] helical
+B) small circular loop {{ANS}}
+C) [ ] parabolic reflector
+D) [ ] Yagi-uda

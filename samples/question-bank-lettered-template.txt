@@ -1,0 +1,14 @@
+Title: LETTERED FORMAT SAMPLE
+Points: 2
+
+1) The dielectric material surrounding fiber core is called
+A) [x] Cladding
+B) [ ] Armor
+C) [ ] Shield
+D) [ ] Cover
+
+2. Circularly polarized antenna is the (Points: 3)
+a. [ ] parabolic reflector
+b) helical {{ANS}}
+c. [ ] Yagi-uda
+d) [ ] small circular loop

@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<OfficeApp xmlns="http://schemas.microsoft.com/office/appforoffice/1.1"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xmlns:bt="http://schemas.microsoft.com/office/officeappbasictypes/1.0"
+  xmlns:ov="http://schemas.microsoft.com/office/taskpaneappversionoverrides"
+  xsi:type="TaskPaneApp">
+  <Id>b594b417-0f2d-4ace-8d74-0b338f6f8ab2</Id>
+  <Version>1.0.2.0</Version>
+  <ProviderName>QTI Add-in MVP</ProviderName>
+  <DefaultLocale>en-US</DefaultLocale>
+  <DisplayName DefaultValue="QTI Exporter by DNBC" />
+  <Description DefaultValue="Generate LMS-ready QTI ZIP files from Word content." />
+  <IconUrl DefaultValue="https://localhost:3000/addin/assets/icon-16.png?v=logo-20260314-1" />
+  <HighResolutionIconUrl DefaultValue="https://localhost:3000/addin/assets/icon-32.png?v=logo-20260314-1" />
+  <SupportUrl DefaultValue="https://localhost:3000" />
+  <AppDomains>
+    <AppDomain>https://localhost:3000</AppDomain>
+  </AppDomains>
+  <Hosts>
+    <Host Name="Document" />
+  </Hosts>
+  <DefaultSettings>
+    <SourceLocation DefaultValue="https://localhost:3000/addin/taskpane.html?v=20260314-11" />
+  </DefaultSettings>
+  <Permissions>ReadWriteDocument</Permissions>
+  <VersionOverrides xmlns="http://schemas.microsoft.com/office/taskpaneappversionoverrides" xsi:type="VersionOverridesV1_0">
+    <Hosts>
+      <Host xsi:type="Document">
+        <DesktopFormFactor>
+          <GetStarted>
+            <Title resid="GetStarted.Title" />
+            <Description resid="GetStarted.Description" />
+            <LearnMoreUrl resid="GetStarted.LearnMoreUrl" />
+          </GetStarted>
+          <FunctionFile resid="Commands.Url" />
+          <ExtensionPoint xsi:type="PrimaryCommandSurface">
+            <OfficeTab id="TabHome">
+              <Group id="QtiGroup">
+                <Label resid="QtiGroup.Label" />
+                <Icon>
+                  <bt:Image size="16" resid="Icon.16" />
+                  <bt:Image size="32" resid="Icon.32" />
+                  <bt:Image size="80" resid="Icon.80" />
+                </Icon>
+                <Control xsi:type="Button" id="OpenTaskPaneButton">
+                  <Label resid="OpenTaskPaneButton.Label" />
+                  <Supertip>
+                    <Title resid="OpenTaskPaneButton.Label" />
+                    <Description resid="OpenTaskPaneButton.Tooltip" />
+                  </Supertip>
+                  <Icon>
+                    <bt:Image size="16" resid="Icon.16" />
+                    <bt:Image size="32" resid="Icon.32" />
+                    <bt:Image size="80" resid="Icon.80" />
+                  </Icon>
+                  <Action xsi:type="ShowTaskpane">
+                    <TaskpaneId>ButtonId1</TaskpaneId>
+                    <SourceLocation resid="Taskpane.Url" />
+                  </Action>
+                </Control>
+              </Group>
+            </OfficeTab>
+          </ExtensionPoint>
+        </DesktopFormFactor>
+      </Host>
+    </Hosts>
+    <Resources>
+      <bt:Images>
+        <bt:Image id="Icon.16" DefaultValue="https://localhost:3000/addin/assets/icon-16.png?v=logo-20260314-1" />
+        <bt:Image id="Icon.32" DefaultValue="https://localhost:3000/addin/assets/icon-32.png?v=logo-20260314-1" />
+        <bt:Image id="Icon.80" DefaultValue="https://localhost:3000/addin/assets/icon-80.png?v=logo-20260314-1" />
+      </bt:Images>
+      <bt:Urls>
+        <bt:Url id="GetStarted.LearnMoreUrl" DefaultValue="https://learn.microsoft.com/office/dev/add-ins/" />
+        <bt:Url id="Commands.Url" DefaultValue="https://localhost:3000/addin/taskpane.html?v=20260314-11" />
+        <bt:Url id="Taskpane.Url" DefaultValue="https://localhost:3000/addin/taskpane.html?v=20260314-11" />
+      </bt:Urls>
+      <bt:ShortStrings>
+        <bt:String id="GetStarted.Title" DefaultValue="Get started with QTI Exporter by DNBC" />
+        <bt:String id="QtiGroup.Label" DefaultValue="QTI Tools" />
+        <bt:String id="OpenTaskPaneButton.Label" DefaultValue="QTI Exporter by DNBC" />
+      </bt:ShortStrings>
+      <bt:LongStrings>
+        <bt:String id="GetStarted.Description" DefaultValue="Open the task pane to generate QTI ZIP packages." />
+        <bt:String id="OpenTaskPaneButton.Tooltip" DefaultValue="Open QTI Exporter by DNBC task pane." />
+      </bt:LongStrings>
+    </Resources>
+  </VersionOverrides>
+</OfficeApp>

@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>QTI Exporter by DNBC</title>
+    <link rel="stylesheet" href="./taskpane.css?v=20260314-10" />
+    <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+  </head>
+  <body>
+    <main class="container">
+      <h1>QTI Exporter by DNBC</h1>
+      <p class="subtitle">Generate an LMS-ready QTI ZIP from this Word document.</p>
+      <label class="option" for="strictModeToggle">
+        <input id="strictModeToggle" type="checkbox" />
+        <span>Strict mode (check all generated XML files)</span>
+      </label>
+      <button id="checkButton" class="secondary-button" disabled>Check Questions</button>
+      <button id="generateButton" disabled>Generate QTI ZIP</button>
+      <p id="status" class="status">Initializing Office...</p>
+    </main>
+    <script type="module" src="./taskpane.js?v=20260314-10"></script>
+  </body>
+</html>

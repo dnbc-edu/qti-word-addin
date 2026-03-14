@@ -1,0 +1,20 @@
+Title: COMMUNICATIONS ENG EXAM 1
+Points: 1
+
+1. That dielectric material of an optical fiber surrounding the core (Points: 2)
+- [x] Cladding
+- [ ] Armor
+- [ ] Shield
+- [ ] Cover
+
+2. An antenna that is circularly polarized is the
+- [ ] parabolic reflector
+- [x] helical
+- [ ] Yagi-uda
+- [ ] small circular loop
+
+3. A word in telegraphy consist of characters plus a word space.
+- [ ] 11
+- [x] 7 and 1½
+- [ ] 8
+- [ ] 5
