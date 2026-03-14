@@ -191,6 +191,10 @@ GitHub Actions workflows included:
 
 After each successful Pages deploy, download artifact `qti-word-addin-release-prod-from-pages` from the workflow run to get a verified production manifest bundle.
 
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development workflow and pull request expectations.
+
 ## License and legal (draft)
 
 Use this section as a starter for distribution. Replace placeholders before release.
@@ -210,9 +214,9 @@ You are responsible for reviewing and complying with those licenses when distrib
 ### Terms, privacy, and support
 
 For distributed builds (especially outside internal use), publish and link:
-- Terms of Use / EULA: **TBD**
-- Privacy Policy: **TBD**
-- Support Contact: **TBD**
+- Terms of Use / EULA: [docs/TERMS_OF_USE.md](docs/TERMS_OF_USE.md)
+- Privacy Policy: [docs/PRIVACY_POLICY.md](docs/PRIVACY_POLICY.md)
+- Support Contact: [docs/SUPPORT.md](docs/SUPPORT.md)
 
 ### Warranty disclaimer (sample)
 

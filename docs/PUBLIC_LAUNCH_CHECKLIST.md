@@ -49,9 +49,9 @@ npm run check:all
 ## 5) Legal and trust
 
 - [ ] Keep `LICENSE` present (MIT).
-- [ ] Publish Terms of Use URL.
-- [ ] Publish Privacy Policy URL.
-- [ ] Publish support contact URL/email.
+- [ ] Publish Terms of Use URL (default: `docs/TERMS_OF_USE.md`).
+- [ ] Publish Privacy Policy URL (default: `docs/PRIVACY_POLICY.md`).
+- [ ] Publish support contact URL/email (default: `docs/SUPPORT.md`).
 - [ ] Ensure legal/support URLs are ready for app listing and user documentation.
 
 ## 6) Distribution
