@@ -22,6 +22,7 @@ export default defineConfig(async () => {
       emptyOutDir: true,
       rollupOptions: {
         input: {
+          index: 'index.html',
           taskpane: 'addin/taskpane.html'
         }
       }
