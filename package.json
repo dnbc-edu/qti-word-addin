@@ -21,7 +21,7 @@
     "dev:word": "npm run sideload:word && npm run dev:addin",
     "dev:word:open": "npm run sideload:word && open -a 'Microsoft Word' && npm run dev:addin",
     "dev:word:clean": "npm run stop:dev && npm run dev:word:open",
-    "build:addin": "vite build --config addin/vite.config.js",
+    "build:addin": "vite build --config addin/vite.config.js && node scripts/copy-addin-static.js",
     "package:addin": "npm run build:addin && node scripts/package-addin.js",
     "package:addin:prod": "npm run build:addin && node scripts/package-addin.js --prod",
     "verify:prod:manifest": "node scripts/verify-prod-manifest.js"
