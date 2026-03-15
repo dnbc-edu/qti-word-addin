@@ -28,5 +28,5 @@ Use GitHub Issues with:
 
 - Reproduction steps
 - Expected vs actual behavior
-- Platform details (Word on macOS/Windows/Web)
+- Platform details (start with Word Web, then macOS/Windows Desktop if relevant)
 - Sample input (if shareable)

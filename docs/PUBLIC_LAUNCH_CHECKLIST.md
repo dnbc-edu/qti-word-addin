@@ -40,9 +40,10 @@ npm run check:all
 
 ## 4) Cross-platform compatibility
 
+- [ ] Treat Word Web as the primary user path for release readiness.
+- [ ] Test first on Word Web.
 - [ ] Test on Word Desktop (Windows).
 - [ ] Test on Word Desktop (macOS).
-- [ ] Test on Word Web.
 - [ ] Confirm add-in icon/ribbon labels are correct.
 - [ ] Confirm taskpane assets load from GitHub Pages URL (not localhost).
 

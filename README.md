@@ -103,6 +103,16 @@ The task pane reads current Word document text and generates a downloadable QTI 
 Before download, it performs a well-formed XML check on generated XML.
 With `Strict mode` enabled in the task pane, it checks all generated XML files (`assessment`, `imsmanifest`, and `assessment_meta`).
 
+## Recommended platform
+
+For end users, **Word on the web is the recommended/easiest path** for this add-in:
+
+- The production manifest targets publicly hosted GitHub Pages URLs.
+- Setup is simpler for many users (upload manifest in Word web, no local dev server).
+- Cross-platform availability is better for mixed device environments.
+
+Word Desktop on macOS/Windows remains supported and should still be tested before broad rollout.
+
 ## Run add-in locally
 
 1. Install dependencies:

@@ -49,10 +49,13 @@ ADDIN_BASE_URL="https://<username>.github.io/<repo>" npm run verify:prod:manifes
 
 6. Smoke test in Word:
 
+- Start with Word on the web (recommended primary path).
 - Open add-in in Word.
 - Confirm the taskpane loads from GitHub Pages URL.
 - Run `Check Questions` and `Generate QTI ZIP` with a sample document.
 - Import resulting ZIP into target LMS for final confidence check.
+
+Then validate on Word Desktop (Windows/macOS) for secondary compatibility.
 
 ## Optional: build production bundle in GitHub UI
 
