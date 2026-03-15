@@ -11,6 +11,18 @@ const MATH_NS = 'http://schemas.openxmlformats.org/officeDocument/2006/math';
 
 function setStatus(message) {
   statusNode.textContent = message;
+
+  const normalizedMessage = (message || '').toLowerCase();
+  statusNode.classList.remove('status-success', 'status-error');
+
+  if (normalizedMessage.startsWith('error:')) {
+    statusNode.classList.add('status-error');
+    return;
+  }
+
+  if (normalizedMessage.startsWith('check passed') || normalizedMessage.startsWith('done')) {
+    statusNode.classList.add('status-success');
+  }
 }
 
 function toSafeFilename(value) {
