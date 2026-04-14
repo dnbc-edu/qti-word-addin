@@ -418,13 +418,13 @@ async function getDocumentParserText() {
 
     try {
       const domText = ooxmlToParserText(normalizedOoxmlRaw);
-      candidates.push({ source: 'ooxml-dom', rawText: domText, equationCount: countEquationPlaceholders(domText) });
+      candidates.push({ source: 'ooxml-dom', rawText: domText, equationCount: countEquationPlaceholders(domText), ooxml: normalizedOoxmlRaw });
     } catch {
     }
 
     try {
       const regexText = ooxmlToParserTextRegexFallback(normalizedOoxmlRaw);
-      candidates.push({ source: 'ooxml-regex', rawText: regexText, equationCount: countEquationPlaceholders(regexText) });
+      candidates.push({ source: 'ooxml-regex', rawText: regexText, equationCount: countEquationPlaceholders(regexText), ooxml: normalizedOoxmlRaw });
     } catch {
     }
   } catch {
@@ -461,7 +461,8 @@ async function getDocumentParserText() {
   const selected = validCandidates[0] || { source: 'text', rawText: '', equationCount: 0 };
   return {
     rawText: selected.rawText,
-    source: selected.source
+    source: selected.source,
+    ooxml: selected.ooxml || null
   };
 }
 
@@ -509,7 +510,7 @@ async function handleGenerate() {
 
 async function runPreflightChecks() {
   setStatus('Reading document...');
-  const { rawText, source } = await getDocumentParserText();
+  const { rawText, source, ooxml } = await getDocumentParserText();
   const equationCount = countEquationPlaceholders(rawText);
 
   setStatus(
@@ -522,7 +523,15 @@ async function runPreflightChecks() {
   const parsed = parseForValidation(rawText);
 
   setStatus(`Generating package for ${parsed.questions.length} question(s)...`);
-  const artifacts = await generateQtiPackageArtifacts(rawText);
+  const debugRawText = (source && source.startsWith('ooxml')) ? (ooxml || rawText) : rawText;
+  const artifacts = await generateQtiPackageArtifacts(rawText, {
+    debugInfo: {
+      enabled: true,
+      source,
+      equationCount,
+      rawText: debugRawText
+    }
+  });
 
   const strictModeEnabled = Boolean(strictModeToggle?.checked);
   setStatus(
