@@ -4,7 +4,7 @@ const checkButton = document.getElementById('checkButton');
 const generateButton = document.getElementById('generateButton');
 const statusNode = document.getElementById('status');
 const strictModeToggle = document.getElementById('strictModeToggle');
-const APP_VERSION = '2026.03.14-final10';
+const APP_VERSION = '2026.04.14-final11';
 
 const WORD_NS = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
 const MATH_NS = 'http://schemas.openxmlformats.org/officeDocument/2006/math';
