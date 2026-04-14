@@ -1,0 +1,13 @@
+Title:WORD WEB COMPACT MARKER SAMPLE
+Points:2
+1.Evaluate the first derivative of the implicit function
+a.4x+y/x+y
+b.4x-y/x+y
+c.4x+y/x+y{{ANS}}
+d.4x+y/x-y
+
+2.Which particle is negatively charged?
+1.Electron {{ANS}}
+2.Proton
+3.Neutron
+4.Molecule

@@ -1,4 +1,4 @@
-Title: SUPPORTED FORMATS SAMPLE
+Title: SINGLE-ANSWER MCQ FORMATS SAMPLE
 Points: 2
 
 1. What are found in the nucleus of an atom?
@@ -19,8 +19,9 @@ D) [ ] Molecule
 - [ ] Neutron
 - [ ] Molecule
 
-What is the particle of an atom that has no electrical charge? (Points: 1.5)
-Electrons
-Protons
-Neutron {{ANS}}
-Molecule
+4. What is the particle of an atom that has no electrical charge? (Points: 1.5)
+1. Electrons
+2. Protons
+3. Neutron {{ANS}}
+4. Molecule
+
