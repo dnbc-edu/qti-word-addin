@@ -135,7 +135,7 @@ function extractAnswerMarker(text) {
 }
 
 function parseQuestionLine(line) {
-  const match = line.match(/^(\d+)(?:[.)])?(?:\s+|\t+)(.+)$/);
+  const match = line.match(/^(\d+)(?:[.)])?(?:\s+|\t+)?(.+)$/);
   if (!match) {
     const fallbackParsedStem = extractPointsFromStem(line);
     if (!fallbackParsedStem.stem.endsWith('?')) {
@@ -175,7 +175,7 @@ function extractPointsFromStem(stemText) {
 }
 
 function parseLetteredChoiceLine(line) {
-  const match = line.match(/^([a-z])(?:[.)])?(?:\s+|\t+)(?:\[(x| )\](?:\s+|\t+))?(.+)$/i);
+  const match = line.match(/^([a-z])(?:[.)])(?:\s+|\t+)?(?:\[(x| )\](?:\s+|\t+)?)?(.+)$/i);
   if (!match) {
     return null;
   }
@@ -188,7 +188,7 @@ function parseLetteredChoiceLine(line) {
 }
 
 function parseNumberedChoiceLine(line) {
-  const match = line.match(/^(\d+)(?:[.)])(?:\s+|\t+)(?:\[(x| )\](?:\s+|\t+))?(.+)$/i);
+  const match = line.match(/^(\d+)(?:[.)])(?:\s+|\t+)?(?:\[(x| )\](?:\s+|\t+)?)?(.+)$/i);
   if (!match) {
     return null;
   }
@@ -282,9 +282,13 @@ function splitFlattenedWordInput(inputText) {
   let withBreaks = flattened;
   withBreaks = withBreaks.replace(/\s+(?=Title:\s*)/gi, '\n');
   withBreaks = withBreaks.replace(/\s+(?=Points:\s*[0-9])/gi, '\n');
-  withBreaks = withBreaks.replace(/\s+(?=\d+[.)](?:\s+|\t+))/g, '\n');
-  withBreaks = withBreaks.replace(/\s+(?=[a-z][.)](?:\s+|\t+))/gi, '\n');
-  withBreaks = withBreaks.replace(/\s+(?=-\s*\[(?:x| )\]\s+)/gi, '\n');
+  withBreaks = withBreaks.replace(/\s+(?=\d+[.)]\s*)/g, '\n');
+  withBreaks = withBreaks.replace(/\s+(?=[a-z][.)]\s*)/gi, '\n');
+  withBreaks = withBreaks.replace(/\s+(?=-\s*\[(?:x| )\]\s*)/gi, '\n');
+
+  // Also split marker runs that were glued directly to previous tokens.
+  withBreaks = withBreaks.replace(/([^\n])(?=\d+[.)]\s*)/g, '$1\n');
+  withBreaks = withBreaks.replace(/([^\n])(?=[a-z][.)]\s*)/gi, '$1\n');
 
   return withBreaks
     .split(/\n/)
