@@ -187,6 +187,41 @@ function parseLetteredChoiceLine(line) {
   };
 }
 
+function parseNumberedChoiceLine(line) {
+  const match = line.match(/^(\d+)(?:[.)])(?:\s+|\t+)(?:\[(x| )\](?:\s+|\t+))?(.+)$/i);
+  if (!match) {
+    return null;
+  }
+
+  return {
+    number: Number(match[1]),
+    checkboxMark: match[2] || '',
+    text: match[3]
+  };
+}
+
+function looksLikeQuestionStem(text) {
+  const normalized = String(text || '').trim();
+  return /\?\s*$/.test(normalized) || /\(\s*points\s*:/i.test(normalized);
+}
+
+function shouldTreatAsNumberedChoice(numberedChoice, currentQuestion) {
+  if (!currentQuestion) {
+    return false;
+  }
+
+  const expectedChoiceNumber = currentQuestion.choices.length + 1;
+  if (numberedChoice.number !== expectedChoiceNumber) {
+    return false;
+  }
+
+  if (looksLikeQuestionStem(numberedChoice.text)) {
+    return false;
+  }
+
+  return true;
+}
+
 function parseGenericChoiceLine(line) {
   const match = line.match(/^(?:[-•*]\s*)?(?:\[(x| )\](?:\s+|\t+))?(.+)$/i);
   if (!match) {
@@ -243,6 +278,21 @@ function parseQuestionBank(inputText) {
       if (Number.isFinite(parsedPoints) && parsedPoints > 0) {
         documentDefaultPoints = parsedPoints;
       }
+      continue;
+    }
+
+    const numberedChoice = parseNumberedChoiceLine(line);
+    if (numberedChoice && shouldTreatAsNumberedChoice(numberedChoice, currentQuestion)) {
+      const parsedChoiceText = extractAnswerMarker(numberedChoice.text);
+      const checkboxMarked = numberedChoice.checkboxMark.toLowerCase() === 'x';
+      const markerMarked = parsedChoiceText.hasAnswerMarker;
+      const markedBy = resolveMarkedBy(checkboxMarked, markerMarked);
+
+      currentQuestion.choices.push({
+        text: parsedChoiceText.cleanedText,
+        isCorrect: checkboxMarked || markerMarked,
+        markedBy
+      });
       continue;
     }
 
