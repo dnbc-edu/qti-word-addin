@@ -253,6 +253,46 @@ function resolveMarkedBy(checkboxMarked, markerMarked) {
 function parseQuestionBank(inputText) {
   const normalizedInput = inputText.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
   const lines = normalizedInput.split(/\n/);
+
+  try {
+    return parseQuestionBankFromLines(lines);
+  } catch (error) {
+    const message = String(error?.message || '');
+    if (!message.includes('No questions were parsed')) {
+      throw error;
+    }
+
+    const fallbackLines = splitFlattenedWordInput(normalizedInput);
+    return parseQuestionBankFromLines(fallbackLines);
+  }
+}
+
+function splitFlattenedWordInput(inputText) {
+  const flattened = inputText
+    .replace(/\r\n/g, '\n')
+    .replace(/\r/g, '\n')
+    .replace(/[ \t]+/g, ' ')
+    .replace(/\n+/g, ' ')
+    .trim();
+
+  if (!flattened) {
+    return [];
+  }
+
+  let withBreaks = flattened;
+  withBreaks = withBreaks.replace(/\s+(?=Title:\s*)/gi, '\n');
+  withBreaks = withBreaks.replace(/\s+(?=Points:\s*[0-9])/gi, '\n');
+  withBreaks = withBreaks.replace(/\s+(?=\d+[.)](?:\s+|\t+))/g, '\n');
+  withBreaks = withBreaks.replace(/\s+(?=[a-z][.)](?:\s+|\t+))/gi, '\n');
+  withBreaks = withBreaks.replace(/\s+(?=-\s*\[(?:x| )\]\s+)/gi, '\n');
+
+  return withBreaks
+    .split(/\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+}
+
+function parseQuestionBankFromLines(lines) {
   let title = 'Word QTI Assessment';
   let documentDefaultPoints = 1;
   const questions = [];
