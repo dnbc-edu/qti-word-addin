@@ -167,6 +167,39 @@ async function extractTextFromDocx(buffer) {
         }
       }
 
+      // Handle simple superscripts / subscripts encoded as <m:sSup>, <m:sSub>, or <m:sup>/<m:sub>
+      if (/\<m:sSup\b|\<m:sSub\b|<m:sup|<m:sub/i.test(mathMatch)) {
+        const eBlock = (mathMatch.match(/<m:e[\s\S]*?<\/m:e>/i) || [])[0] || '';
+        const supBlock = (mathMatch.match(/<m:sup[\s\S]*?<\/m:sup>/i) || (mathMatch.match(/<m:sSup[\s\S]*?<\/m:sSup>/i) || []))[0] || '';
+        const subBlock = (mathMatch.match(/<m:sub[\s\S]*?<\/m:sub>/i) || (mathMatch.match(/<m:sSub[\s\S]*?<\/m:sSub>/i) || []))[0] || '';
+        const tRegex = /<m:t[^>]*>([\s\S]*?)<\/m:t>/gi;
+        let m;
+        let eText = '';
+        let supText = '';
+        let subText = '';
+        if (eBlock) {
+          while ((m = tRegex.exec(eBlock))) eText += m[1];
+          tRegex.lastIndex = 0;
+        }
+        if (supBlock) {
+          while ((m = tRegex.exec(supBlock))) supText += m[1];
+          tRegex.lastIndex = 0;
+        }
+        if (subBlock) {
+          while ((m = tRegex.exec(subBlock))) subText += m[1];
+          tRegex.lastIndex = 0;
+        }
+        eText = String(eText || '').trim();
+        supText = String(supText || '').trim();
+        subText = String(subText || '').trim();
+        if (eText) {
+          let latex = eText;
+          if (supText) latex = `${latex}^{${supText}}`;
+          if (subText) latex = `${latex}_{${subText}}`;
+          return `{{EQ:${latex}}}`;
+        }
+      }
+
       // Fallback: flatten inner <m:t> text into placeholder
       const mtRegex = /<m:t[^>]*>([\s\S]*?)<\/m:t>/gi;
       let mtMatch;
@@ -288,6 +321,13 @@ function convertOmmlMathToLatex(mathText) {
 
   // Replace 'infty' with \infty
   t = t.replace(/infty/gi, '\\infty');
+
+  // Fallback: if expression looks like a single identifier immediately followed by digits (e.g., "x7"), treat as exponent
+  // Only match when there's no operator (+-*/^) to avoid false positives like "x+7".
+  const simpleExpMatch = t.match(/^([A-Za-z]+)(\d+)$/);
+  if (simpleExpMatch) {
+    return `${simpleExpMatch[1]}^{${simpleExpMatch[2]}}`;
+  }
 
   return t;
 }
