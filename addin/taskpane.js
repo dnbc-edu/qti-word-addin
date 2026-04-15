@@ -170,6 +170,42 @@ function renderOmmlNodeToLatex(node) {
     return renderFractionToLatex(element);
   }
 
+  if (element.localName === 'nary') {
+    // Handle n-ary operators (integrals, sums). Default to integral when symbol not explicit.
+    const subNode = firstDirectChildByTag(element, MATH_NS, 'sub');
+    const supNode = firstDirectChildByTag(element, MATH_NS, 'sup');
+    const eNode = firstDirectChildByTag(element, MATH_NS, 'e');
+
+    const subLatex = subNode ? renderChildContent(subNode).trim() : '';
+    const supLatex = supNode ? renderChildContent(supNode).trim() : '';
+    const exprLatex = eNode ? renderChildContent(eNode).trim() : '';
+
+    const subFmt = subLatex ? `_{${subLatex}}` : '';
+    const supFmt = supLatex ? `^{${supLatex}}` : '';
+
+    if (!exprLatex) return '';
+    return `\\int${subFmt}${supFmt} ${exprLatex}`;
+  }
+
+  if (element.localName === 'func') {
+    // Handle function-like constructs; specifically lim with limLow/lim
+    // Find any descendant <m:lim> element
+    const limElems = element.getElementsByTagNameNS(MATH_NS, 'lim');
+    if (limElems && limElems.length) {
+      const limNode = limElems[0];
+      const limText = renderChildContent(limNode).replace(/\s+/g, ' ').trim();
+      // parse var and value: e.g. "x→0" or "x->0" or "x to 0"
+      const parts = limText.split(/→|->|\\\\to|\sto|\s+to\s+/).map(p => p.trim()).filter(Boolean);
+      const varName = parts[0] || '';
+      const val = parts[1] || '';
+      const exprNode = firstDirectChildByTag(element, MATH_NS, 'e');
+      const expr = exprNode ? renderChildContent(exprNode).trim() : '';
+      if (varName && val) {
+        return `\\lim_{${varName}\\to ${val}} ${expr}`.trim();
+      }
+    }
+  }
+
   if (element.localName === 't') {
     return element.textContent || '';
   }
