@@ -264,6 +264,43 @@ function convertOmmlBlockToPlaceholderByRegex(ommlBlock) {
   }
 
   let latex = tokens.join(' ');
+  const compact = latex.replace(/\s+/g, ' ').trim();
+
+  // Normalize integral symbol
+  if (compact.includes('∫')) {
+    // replace unicode with 'int' for simple handling
+    latex = latex.replace(/∫/g, 'int');
+  }
+
+  // Handle limits like: lim x→0 expression  -> \lim_{x\to 0} expression
+  if (/\blim\b/i.test(compact)) {
+    const limMatch = compact.match(/lim\s*([A-Za-z0-9]+)[\s\u2192->\\to]*([A-Za-z0-9]+)\s*(.*)/i);
+    if (limMatch) {
+      const varName = limMatch[1];
+      const val = limMatch[2];
+      const rest = limMatch[3] || '';
+      latex = `\\lim_{${varName}\\to ${val}} ${rest}`.trim();
+    }
+  }
+
+  // Handle simple integrals: int a b expr -> \int_{a}^{b} expr
+  if (/\bint\b/i.test(compact)) {
+    const intMatch = compact.match(/int\s*([^\s]+)?\s*([^\s]+)?\s*(.*)/i);
+    if (intMatch) {
+      const sub = intMatch[1] || '';
+      const sup = intMatch[2] || '';
+      const rest = intMatch[3] || '';
+      const subFmt = sub ? `_{${sub}}` : '';
+      const supFmt = sup ? `^{${sup}}` : '';
+      latex = `\\int${subFmt}${supFmt} ${rest}`.trim();
+    }
+  }
+
+  // Simple exponent fallback: x7 -> x^{7}
+  const simpleExp = compact.match(/^([A-Za-z]+)(\d+)$/);
+  if (simpleExp) {
+    latex = `${simpleExp[1]}^{${simpleExp[2]}}`;
+  }
   if (ommlBlock.includes('<m:rad')) {
     if (tokens.length >= 2) {
       latex = `\\sqrt[${tokens[0]}]{${tokens.slice(1).join(' ')}}`;
