@@ -330,7 +330,7 @@ function convertOmmlBlockToPlaceholderByRegex(ommlBlock) {
 
   // Handle limits like: lim x→0 expression  -> \lim_{x\to 0} expression
   if (/\blim\b/i.test(compact)) {
-    const limMatch = compact.match(/lim\s*([A-Za-z0-9]+)[\s\u2192->\\to]*([A-Za-z0-9]+)\s*(.*)/i);
+    const limMatch = compact.match(/lim\s*([A-Za-z0-9]+)(?:\s|\u2192|->|\\to)*([A-Za-z0-9]+)\s*(.*)/i);
     if (limMatch) {
       const varName = limMatch[1];
       const val = limMatch[2];
