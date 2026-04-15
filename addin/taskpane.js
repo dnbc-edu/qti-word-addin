@@ -195,13 +195,30 @@ function renderOmmlNodeToLatex(node) {
       const limNode = limElems[0];
       const limText = renderChildContent(limNode).replace(/\s+/g, ' ').trim();
       // parse var and value: e.g. "x→0" or "x->0" or "x to 0"
-      const parts = limText.split(/→|->|\\\\to|\sto|\s+to\s+/).map(p => p.trim()).filter(Boolean);
+      const parts = limText.split(/→|->|\\to|\sto|\s+to\s+/).map(p => p.trim()).filter(Boolean);
       const varName = parts[0] || '';
       const val = parts[1] || '';
       const exprNode = firstDirectChildByTag(element, MATH_NS, 'e');
       const expr = exprNode ? renderChildContent(exprNode).trim() : '';
       if (varName && val) {
         return `\\lim_{${varName}\\to ${val}} ${expr}`.trim();
+      }
+    }
+
+    // Handle named functions like sin, cos, tan, log, ln, exp, etc.
+    const fNameNode = firstDirectChildByTag(element, MATH_NS, 'fName') || (element.getElementsByTagNameNS ? element.getElementsByTagNameNS(MATH_NS, 'fName')[0] : null);
+    const eNode = firstDirectChildByTag(element, MATH_NS, 'e') || (element.getElementsByTagNameNS ? element.getElementsByTagNameNS(MATH_NS, 'e')[0] : null);
+    if (fNameNode) {
+      const rawName = renderChildContent(fNameNode).trim();
+      const arg = eNode ? renderChildContent(eNode).trim() : '';
+      if (rawName) {
+        const name = rawName.toLowerCase();
+        const fnMap = {
+          sin: '\\sin', cos: '\\cos', tan: '\\tan', csc: '\\csc', sec: '\\sec', cot: '\\cot',
+          arcsin: '\\arcsin', arccos: '\\arccos', arctan: '\\arctan', log: '\\log', ln: '\\ln', exp: '\\exp'
+        };
+        const fnLatex = fnMap[name] || `\\operatorname{${rawName}}`;
+        return arg ? `${fnLatex}\\left(${arg}\\right)` : fnLatex;
       }
     }
   }
@@ -416,6 +433,17 @@ function convertOmmlBlockToPlaceholderByRegex(ommlBlock) {
     if (numerator && denominator) {
       latex = `\\frac{${numerator}}{${denominator}}`;
     }
+  }
+
+  // Handle function tokens from regex fallback: sin, cos, tan, log, ln, exp, etc.
+  const funcMatch = compact.match(/^(sin|cos|tan|csc|sec|cot|arcsin|arccos|arctan|log|ln|exp)\b\s*(.*)$/i);
+  if (funcMatch) {
+    const fn = funcMatch[1].toLowerCase();
+    const rest = funcMatch[2] || '';
+    const fnMap = { sin: '\\sin', cos: '\\cos', tan: '\\tan', csc: '\\csc', sec: '\\sec', cot: '\\cot', arcsin: '\\arcsin', arccos: '\\arccos', arctan: '\\arctan', log: '\\log', ln: '\\ln', exp: '\\exp' };
+    const fnLatex = fnMap[fn] || `\\operatorname{${fn}}`;
+    const arg = rest.trim();
+    latex = arg ? `${fnLatex}(${arg})` : fnLatex;
   }
 
   return ` {{EQ:${latex}}} `;

@@ -322,6 +322,10 @@ function convertOmmlMathToLatex(mathText) {
   // Replace 'infty' with \infty
   t = t.replace(/infty/gi, '\\infty');
 
+  // Map common trig/log functions to LaTeX commands
+  t = t.replace(/\b(arcsin|arccos|arctan|sin|cos|tan|csc|sec|cot)\b/gi, (m) => `\\${m.toLowerCase()}`);
+  t = t.replace(/\b(log|ln|exp)\b/gi, (m) => `\\${m.toLowerCase()}`);
+
   // Fallback: if expression looks like a single identifier immediately followed by digits (e.g., "x7"), treat as exponent
   // Only match when there's no operator (+-*/^) to avoid false positives like "x+7".
   const simpleExpMatch = t.match(/^([A-Za-z]+)(\d+)$/);

@@ -96,6 +96,16 @@ function convertOmmlBlockToPlaceholderByRegex(ommlBlock) {
       latex = `\\frac{${numerator}}{${denominator}}`;
     }
   }
+  // Handle function tokens from regex fallback: sin, cos, tan, log, ln, exp, etc.
+  const funcMatch = compact.match(/^(sin|cos|tan|csc|sec|cot|arcsin|arccos|arctan|log|ln|exp)\b\s*(.*)$/i);
+  if (funcMatch) {
+    const fn = funcMatch[1].toLowerCase();
+    const rest = funcMatch[2] || '';
+    const fnMap = { sin: '\\sin', cos: '\\cos', tan: '\\tan', csc: '\\csc', sec: '\\sec', cot: '\\cot', arcsin: '\\arcsin', arccos: '\\arccos', arctan: '\\arctan', log: '\\log', ln: '\\ln', exp: '\\exp' };
+    const fnLatex = fnMap[fn] || `\\operatorname{${fn}}`;
+    const arg = rest.trim();
+    latex = arg ? `${fnLatex}(${arg})` : fnLatex;
+  }
   // Combine token + space + number into exponent: "x 7" or "(a+b) 2" -> "x^{7}" or "(a+b)^{2}"
   latex = latex.replace(/(\S+)\s+(\d+)/g, (m, p1, p2) => {
     if (p1.includes('\\')) return m;
