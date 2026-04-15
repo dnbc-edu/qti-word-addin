@@ -81,6 +81,30 @@ function convertOmmlBlockToPlaceholderByRegex(ommlBlock) {
   if (simpleExp) {
     latex = `${simpleExp[1]}^{${simpleExp[2]}}`;
   }
+  if (ommlBlock.includes('<m:rad')) {
+    if (tokens.length >= 2) {
+      latex = `\\sqrt[${tokens[0]}]{${tokens.slice(1).join(' ')}}`;
+    } else {
+      latex = `\\sqrt{${tokens[0]}}`;
+    }
+  } else if (ommlBlock.includes('<m:f')) {
+    const numeratorMatch = ommlBlock.match(/<m:num>[\s\S]*?<m:t[^>]*>([\s\S]*?)<\/m:t>[\s\S]*?<\/m:num>/);
+    const denominatorMatch = ommlBlock.match(/<m:den>[\s\S]*?<m:t[^>]*>([\s\S]*?)<\/m:t>[\s\S]*?<\/m:den>/);
+    const numerator = numeratorMatch ? decodeXmlEntities(numeratorMatch[1]).trim() : '';
+    const denominator = denominatorMatch ? decodeXmlEntities(denominatorMatch[1]).trim() : '';
+    if (numerator && denominator) {
+      latex = `\\frac{${numerator}}{${denominator}}`;
+    }
+  }
+  // Combine token + space + number into exponent: "x 7" or "(a+b) 2" -> "x^{7}" or "(a+b)^{2}"
+  latex = latex.replace(/(\S+)\s+(\d+)/g, (m, p1, p2) => {
+    if (p1.includes('\\')) return m;
+    return `${p1}^{${p2}}`;
+  });
+  // Ensure integral token is converted to LaTeX '\\int' when not already formatted
+  if (/\bint\b/i.test(latex) && !/\\\\?int/.test(latex)) {
+    latex = latex.replace(/\bint\b/gi, '\\int');
+  }
 
   return ` {{EQ:${latex}}} `;
 }
