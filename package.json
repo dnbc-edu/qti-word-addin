@@ -27,7 +27,8 @@
     "verify:prod:manifest": "node scripts/verify-prod-manifest.js"
   },
   "dependencies": {
-    "jszip": "^3.10.1"
+    "jszip": "^3.10.1",
+    "mammoth": "^1.12.0"
   },
   "devDependencies": {
     "office-addin-dev-certs": "^2.0.6",
