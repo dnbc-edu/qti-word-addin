@@ -227,6 +227,23 @@ function renderOmmlNodeToLatex(node) {
     return element.textContent || '';
   }
 
+  // Handle simple superscript/subscript constructs like <m:sSup>, <m:sSub>, <m:sup>, <m:sub>
+  if (element.localName === 'sSup' || element.localName === 'sSub' || element.localName === 'sup' || element.localName === 'sub') {
+    const eNode = firstDirectChildByTag(element, MATH_NS, 'e') || firstDirectChildByTag(element, MATH_NS, 'base') || null;
+    const supNode = firstDirectChildByTag(element, MATH_NS, 'sup') || firstDirectChildByTag(element, MATH_NS, 'sup') || null;
+    const subNode = firstDirectChildByTag(element, MATH_NS, 'sub') || firstDirectChildByTag(element, MATH_NS, 'sSub') || null;
+
+    const base = eNode ? renderChildContent(eNode).trim() : '';
+    const sup = supNode ? renderChildContent(supNode).trim() : '';
+    const sub = subNode ? renderChildContent(subNode).trim() : '';
+
+    if (!base) return '';
+    let out = base;
+    if (sup) out = `${out}^{${sup}}`;
+    if (sub) out = `${out}_{${sub}}`;
+    return out;
+  }
+
   return renderChildContent(element);
 }
 
