@@ -246,6 +246,62 @@ function ooxmlToParserText(ooxml) {
   return lines.join('\n');
 }
 
+function ooxmlToParserTextWithNumbering(ooxml) {
+  const xmlDoc = new DOMParser().parseFromString(ooxml, 'application/xml');
+  const parserError = xmlDoc.querySelector('parsererror');
+  if (parserError) {
+    throw new Error(`Failed to parse document OOXML: ${parserError.textContent?.trim() || 'Unknown XML parser error'}`);
+  }
+
+  const paragraphs = Array.from(xmlDoc.getElementsByTagNameNS(WORD_NS, 'p'));
+  const parsed = [];
+
+  for (const p of paragraphs) {
+    const numPr = p.getElementsByTagNameNS(WORD_NS, 'numPr')[0] || null;
+    let ilvl = null;
+    let numId = null;
+    if (numPr) {
+      const ilvlNode = numPr.getElementsByTagNameNS(WORD_NS, 'ilvl')[0];
+      const numIdNode = numPr.getElementsByTagNameNS(WORD_NS, 'numId')[0];
+      if (ilvlNode) {
+        ilvl = Number(ilvlNode.getAttribute('w:val') || ilvlNode.getAttribute('val') || 0);
+      }
+      if (numIdNode) {
+        numId = String(numIdNode.getAttribute('w:val') || numIdNode.getAttribute('val') || '');
+      }
+    }
+
+    const text = normalizeParagraphText(xmlNodeToText(p));
+    parsed.push({ text, numId, ilvl });
+  }
+
+  const counters = {};
+  const lines = [];
+
+  for (const p of parsed) {
+    if (!p.text) continue;
+    if (p.numId != null && p.numId !== '') {
+      counters[p.numId] = counters[p.numId] || [];
+      const lvl = p.ilvl != null ? p.ilvl : 0;
+      for (let i = 0; i <= lvl; i++) {
+        if (counters[p.numId][i] == null) counters[p.numId][i] = 0;
+      }
+      counters[p.numId][lvl] += 1;
+      for (let i = lvl + 1; i < counters[p.numId].length; i++) counters[p.numId][i] = 0;
+
+      if (lvl === 0) {
+        lines.push(`${counters[p.numId][0]}. ${p.text}`);
+      } else {
+        lines.push(`- ${p.text}`);
+      }
+    } else {
+      lines.push(p.text);
+    }
+  }
+
+  return lines.join('\n');
+}
+
 function decodeXmlEntities(value) {
   return value
     .replace(/&lt;/g, '<')
@@ -452,6 +508,13 @@ async function getDocumentParserText() {
   try {
     const ooxmlRaw = await getDocumentOoxml();
     const normalizedOoxmlRaw = ooxmlRaw.includes('<w:p') ? ooxmlRaw : decodeXmlEntities(ooxmlRaw);
+
+    // Prefer OOXML extraction that preserves numbering (matches CLI behavior)
+    try {
+      const numberedText = ooxmlToParserTextWithNumbering(normalizedOoxmlRaw);
+      candidates.push({ source: 'ooxml-numbering', rawText: numberedText, equationCount: countEquationPlaceholders(numberedText), ooxml: normalizedOoxmlRaw });
+    } catch {
+    }
 
     try {
       const domText = ooxmlToParserText(normalizedOoxmlRaw);
