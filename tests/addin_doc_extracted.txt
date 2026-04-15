@@ -1,0 +1,27 @@
+Title: GEAS-CHEMISTRY
+Points: 2
+What are found in the nucleus of an atom {{EQ:\lim_{x\to 0} x+7}} .
+Electrons and Protons
+Protons and Neutrons {{ANS}}
+Cations and Anions
+Electrons and Neutrons
+What is the negatively charged particle {{EQ:x^{7}}} of an atom {{EQ:\sqrt[2]{x}}}
+Electrons {{ANS}}
+Protons
+Neutron
+Molecule
+What is the positively charged particle of an atom {{EQ:\frac{(a+b=c)}{2}}}
+Electrons {{EQ:x+2}}
+Protons {{ANS}}
+Neutron
+Molecule
+What is the particle of an atom that has no electrical charge {{EQ:\frac{1}{2}}} ?
+Electrons
+Protons
+Neutron {{ANS}}
+Molecule
+The word "atom" comes from Greek "Atomos" which means what {{EQ:x+7}} ?
+Extremely small
+Invisible
+Indivisible {{ANS}}
+Microscopic
