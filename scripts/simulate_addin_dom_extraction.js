@@ -202,7 +202,7 @@ async function main() {
   // Try numbering-aware
   let numbered = '';
   try {
-    numbered = addin.ooxmlToParserTextWithNumbering(ooxml);
+    numbered = ooxmlToParserTextWithNumbering(ooxml);
   } catch (e) {
     numbered = '';
   }
@@ -210,7 +210,7 @@ async function main() {
   // Try DOM extraction
   let dom = '';
   try {
-    dom = addin.ooxmlToParserText(ooxml);
+    dom = ooxmlToParserText(ooxml);
   } catch (e) {
     dom = '';
   }
@@ -218,7 +218,7 @@ async function main() {
   // Regex fallback
   let regex = '';
   try {
-    regex = addin.ooxmlToParserTextRegexFallback(ooxml);
+    regex = ooxmlToParserTextRegexFallback(ooxml);
   } catch (e) {
     regex = '';
   }
