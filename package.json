@@ -1,6 +1,6 @@
 {
   "name": "qti-word-addin-mvp",
-  "version": "2026.04.15-final14",
+  "version": "2026.04.24-final15",
   "private": true,
   "license": "MIT",
   "author": "Dhon Niño B. Canela",
@@ -12,6 +12,7 @@
     "check:all": "npm run demo && npm run validate:demo && npm run check:mixed-marker",
     "certs:install": "office-addin-dev-certs install",
     "generate:qti": "node scripts/generate-qti.js",
+    "test:parser": "node scripts/test-parser-regressions.js",
     "validate:qti": "node scripts/validate-qti.js",
     "validate:demo": "node scripts/validate-qti.js --zip dist/COMMUNICATIONS-ENG-EXAM-1-qti.zip --version 1p2",
     "demo": "node scripts/generate-qti.js --input samples/question-bank-template.txt --output dist/COMMUNICATIONS-ENG-EXAM-1-qti.zip",

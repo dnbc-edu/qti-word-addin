@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>QTI Exporter by DNBC</title>
-    <link rel="stylesheet" href="./taskpane.css?v=20260414-1" />
+    <link rel="stylesheet" href="./taskpane.css?v=20260424-2" />
     <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
   </head>
   <body>
@@ -14,10 +14,23 @@
         <input id="strictModeToggle" type="checkbox" />
         <span>Strict mode (check all generated XML files)</span>
       </label>
+      <label class="option" for="parserPermissiveToggle">
+        <input id="parserPermissiveToggle" type="checkbox" />
+        <span>Permissive parser (auto-fix missing/multiple correct marks)</span>
+      </label>
       <button id="checkButton" class="secondary-button" disabled>Check Questions</button>
       <button id="generateButton" disabled>Generate QTI ZIP</button>
       <p id="status" class="status">Initializing Office...</p>
+      <section id="checkResults" class="check-results" hidden>
+        <p id="checkResultsSummary" class="check-results-summary"></p>
+        <div id="checkResultsMeta" class="check-results-meta"></div>
+        <div class="check-results-actions">
+          <button id="copyCheckReportButton" class="secondary-button small-button" type="button" disabled>Copy Report</button>
+        </div>
+        <ul id="checkResultsIssues" class="check-results-issues"></ul>
+        <pre id="checkResultsPreview" class="check-results-preview"></pre>
+      </section>
     </main>
-    <script type="module" src="./taskpane.js?v=20260414-1"></script>
+    <script type="module" src="./taskpane.js?v=20260424-2"></script>
   </body>
 </html>

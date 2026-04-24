@@ -138,7 +138,14 @@ function parseQuestionLine(line) {
   const match = line.match(/^(\d+)(?:[.)])?(?:\s+|\t+)?(.+)$/);
   if (!match) {
     const fallbackParsedStem = extractPointsFromStem(line);
-    if (!fallbackParsedStem.stem.endsWith('?')) {
+    // Avoid treating list/choice lines (e.g., "- Choice?" or "• Choice?") as question stems
+    if (/^[-•*\u2013\u2014\u2212]\s*/.test(fallbackParsedStem.stem)) {
+      return null;
+    }
+
+    // Accept unnumbered stems that end with '?' and prompt-style stems that
+    // end with ':' (common in imported DOCX content).
+    if (!/[?:]\s*$/.test(fallbackParsedStem.stem)) {
       return null;
     }
 
@@ -175,7 +182,10 @@ function extractPointsFromStem(stemText) {
 }
 
 function parseLetteredChoiceLine(line) {
-  const match = line.match(/^([a-z])(?:[.)])(?:\s+|\t+)?(?:\[(x| )\](?:\s+|\t+)?)?(.+)$/i);
+  // Handle cases where the choice text might be immediately after the letter/closing paren without a space,
+  // as well as multiple choices on the same line (if we've split by space elsewhere).
+  // But here we rely on the line-by-line input.
+  const match = line.match(/^([a-z])(?:[.)])(?:\s+|\t+)?(?:\[(x| )\](?:\s+|\t+)?)?(.*)$/i);
   if (!match) {
     return null;
   }
@@ -202,7 +212,7 @@ function parseNumberedChoiceLine(line) {
 
 function looksLikeQuestionStem(text) {
   const normalized = String(text || '').trim();
-  return /\?\s*$/.test(normalized) || /\(\s*points\s*:/i.test(normalized);
+  return /[?:]\s*$/.test(normalized) || /\(\s*points\s*:/i.test(normalized);
 }
 
 function shouldTreatAsNumberedChoice(numberedChoice, currentQuestion) {
@@ -223,7 +233,7 @@ function shouldTreatAsNumberedChoice(numberedChoice, currentQuestion) {
 }
 
 function parseGenericChoiceLine(line) {
-  const match = line.match(/^(?:[-•*]\s*)?(?:\[(x| )\](?:\s+|\t+))?(.+)$/i);
+  const match = line.match(/^(?:[-•*\u2013\u2014\u2212]\s*)?(?:\[(x| )\](?:\s+|\t+))?(.+)$/i);
   if (!match) {
     return null;
   }
@@ -250,20 +260,100 @@ function resolveMarkedBy(checkboxMarked, markerMarked) {
   return 'none';
 }
 
-function parseQuestionBank(inputText) {
+function isBulletPrefixedChoiceLine(line) {
+  return /^[-•*\u2013\u2014\u2212]\s*/.test(String(line || '').trim());
+}
+
+function parseQuestionBank(inputText, options = {}) {
+  const diagnostics = options.diagnostics || {
+    warnings: [],
+    autoFixes: [],
+    usedFlattenedFallback: false
+  };
+
   const normalizedInput = inputText.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
   const lines = normalizedInput.split(/\n/);
+  // Simple parse mode: treat any line ending with '?' as a stem and the
+  // subsequent non-empty lines until the next stem as choices. This is a
+  // tolerant fallback useful for flattened or paragraph-based extractions.
+  if (options.simpleParse) {
+    return parseQuestionBankSimple(lines, { ...options, diagnostics });
+  }
+
+  const looksFlattened = /[a-z]\)\S/i.test(normalizedInput);
+  const shouldTryFallbackFromError = (message) => {
+    if (/No questions were parsed/i.test(message)) {
+      return true;
+    }
+
+    // Only attempt flattened fallback on validation errors when input strongly
+    // resembles flattened text. This prevents good structured parses from
+    // being replaced by an inferior fallback parse.
+    if ((/must have at least 2 choices/i.test(message) || /must have exactly 1 correct choice/i.test(message)) && looksFlattened) {
+      return true;
+    }
+
+    return false;
+  };
+
+  const scoreParseQuality = (parsed) => {
+    const questions = parsed?.questions || [];
+    const questionCount = questions.length;
+    const totalChoices = questions.reduce((sum, q) => sum + (q.choices?.length || 0), 0);
+    const lowChoiceQuestions = questions.filter((q) => (q.choices?.length || 0) < 2).length;
+
+    return {
+      questionCount,
+      totalChoices,
+      lowChoiceQuestions
+    };
+  };
+
+  const isFallbackBetter = (primaryParsedPermissive, fallbackParsed) => {
+    const primaryScore = scoreParseQuality(primaryParsedPermissive);
+    const fallbackScore = scoreParseQuality(fallbackParsed);
+
+    if (fallbackScore.questionCount !== primaryScore.questionCount) {
+      return fallbackScore.questionCount > primaryScore.questionCount;
+    }
+
+    if (fallbackScore.lowChoiceQuestions !== primaryScore.lowChoiceQuestions) {
+      return fallbackScore.lowChoiceQuestions < primaryScore.lowChoiceQuestions;
+    }
+
+    return fallbackScore.totalChoices > primaryScore.totalChoices;
+  };
 
   try {
-    return parseQuestionBankFromLines(lines);
+    return parseQuestionBankFromLines(lines, { ...options, diagnostics });
   } catch (error) {
     const message = String(error?.message || '');
-    if (!message.includes('No questions were parsed')) {
+    if (!shouldTryFallbackFromError(message)) {
       throw error;
     }
 
     const fallbackLines = splitFlattenedWordInput(normalizedInput);
-    return parseQuestionBankFromLines(fallbackLines);
+    diagnostics.usedFlattenedFallback = true;
+    const fallbackParsed = parseQuestionBankFromLines(fallbackLines, { ...options, diagnostics });
+
+    // If primary strict parsing failed but primary permissive parsing still has
+    // better structure than fallback, keep strict behavior and surface the
+    // original error instead of silently accepting a lower-quality fallback.
+    try {
+      const primaryParsedPermissive = parseQuestionBankFromLines(lines, {
+        ...options,
+        permissive: true,
+        diagnostics: { warnings: [], autoFixes: [], usedFlattenedFallback: false }
+      });
+      if (!isFallbackBetter(primaryParsedPermissive, fallbackParsed)) {
+        throw error;
+      }
+    } catch (primaryPermissiveError) {
+      // If permissive primary parsing also fails, fallbackParsed remains the
+      // best available result.
+    }
+
+    return fallbackParsed;
   }
 }
 
@@ -289,6 +379,10 @@ function splitFlattenedWordInput(inputText) {
   // Also split marker runs that were glued directly to previous tokens.
   withBreaks = withBreaks.replace(/([^\n])(?=\d+[.)]\s*)/g, '$1\n');
   withBreaks = withBreaks.replace(/([^\n])(?=[a-z][.)]\s*)/gi, '$1\n');
+    // Handle inline lettered choices glued without whitespace: "a)Choiceb)Choice"
+    withBreaks = withBreaks.replace(/([^\n])(?=[a-z]\))/gi, '$1\n');
+    // Also split when a choice label immediately follows choice text (e.g. "Profilingb)" -> insert break before "b)")
+    withBreaks = withBreaks.replace(/([a-z0-9])([a-z])\)/gi, '$1\n$2)');
 
   return withBreaks
     .split(/\n/)
@@ -296,10 +390,15 @@ function splitFlattenedWordInput(inputText) {
     .filter(Boolean);
 }
 
-function parseQuestionBankFromLines(lines) {
+function parseQuestionBankFromLines(lines, options = {}) {
   let title = 'Word QTI Assessment';
   let documentDefaultPoints = 1;
   const questions = [];
+  const diagnostics = options.diagnostics || {
+    warnings: [],
+    autoFixes: [],
+    usedFlattenedFallback: false
+  };
 
   let currentQuestion = null;
 
@@ -342,6 +441,20 @@ function parseQuestionBankFromLines(lines) {
 
     const question = parseQuestionLine(line);
     if (question) {
+      // If the parser returned a fallback question (no numeric index) and
+      // there is an open current question with no choices yet, treat this
+      // as a continuation of the current question's stem rather than
+      // starting a new question. This handles cases where Word split a
+      // multi-part stem containing question marks into separate lines.
+      if (question.index == null && currentQuestion && currentQuestion.choices.length === 0) {
+        currentQuestion.stem = `${currentQuestion.stem} ${question.stem}`.trim();
+        // If the fallback provided points, prefer it only if current has none
+        if (question.pointsPossible != null && (currentQuestion.pointsPossible == null)) {
+          currentQuestion.pointsPossible = question.pointsPossible;
+        }
+        continue;
+      }
+
       if (currentQuestion) {
         questions.push(currentQuestion);
       }
@@ -389,6 +502,17 @@ function parseQuestionBankFromLines(lines) {
 
     const genericChoice = parseGenericChoiceLine(line);
     if (genericChoice && currentQuestion) {
+      if (currentQuestion.choices.length > 0 && !isBulletPrefixedChoiceLine(line)) {
+        const lastChoice = currentQuestion.choices[currentQuestion.choices.length - 1];
+        lastChoice.text += ' ' + genericChoice.text;
+        const parsedChoiceText = extractAnswerMarker(lastChoice.text);
+        lastChoice.text = parsedChoiceText.cleanedText;
+        if (parsedChoiceText.hasAnswerMarker) {
+          lastChoice.isCorrect = true;
+          lastChoice.markedBy = resolveMarkedBy(false, true);
+        }
+        continue;
+      }
       const parsedChoiceText = extractAnswerMarker(genericChoice.text);
       const checkboxMarked = genericChoice.checkboxMark.toLowerCase() === 'x';
       const markerMarked = parsedChoiceText.hasAnswerMarker;
@@ -417,30 +541,75 @@ function parseQuestionBankFromLines(lines) {
       question.pointsPossible = parsedStem.pointsPossible ?? documentDefaultPoints;
     }
   });
-
   for (const question of questions) {
+    if (options.debugParse) {
+      console.log(`Checking question ${question.index}: ${question.choices.length} choices`);
+    }
     if (question.choices.length < 2) {
       throw new Error(`Question ${question.index} must have at least 2 choices.`);
     }
 
-    const markedChoices = question.choices.filter((choice) => choice.isCorrect);
-    const correctCount = markedChoices.length;
+    let markedChoices = question.choices.filter((choice) => choice.isCorrect);
+    let correctCount = markedChoices.length;
 
     if (correctCount > 1) {
       const hasCheckboxMark = markedChoices.some((choice) => choice.markedBy === 'checkbox' || choice.markedBy === 'both');
       const hasAnsMarker = markedChoices.some((choice) => choice.markedBy === 'ans-marker' || choice.markedBy === 'both');
 
-      if (hasCheckboxMark && hasAnsMarker) {
-        throw new Error(
-          `Question ${question.index} has multiple correct choices marked across [x] and {{ANS}} styles. Keep only one correct answer.`
-        );
+      if (!options.permissive) {
+        if (hasCheckboxMark && hasAnsMarker) {
+          throw new Error(
+            `Question ${question.index} has multiple correct choices marked across [x] and {{ANS}} styles. Keep only one correct answer.`
+          );
+        }
+        throw new Error(`Question ${question.index} has multiple correct choices. Keep only one correct answer.`);
       }
 
-      throw new Error(`Question ${question.index} has multiple correct choices. Keep only one correct answer.`);
+      if (options.debugParse) {
+        try {
+          console.error('DEBUG multiple correct choices for question', question.index, JSON.stringify(markedChoices.map(c => ({ text: c.text, isCorrect: c.isCorrect, markedBy: c.markedBy })), null, 2));
+        } catch (e) {
+          // ignore debug-print failures
+        }
+      }
+
+      // AUTO-FIX (permissive only): keep first marked choice and clear the rest.
+      const firstMarked = markedChoices[0];
+      question.choices.forEach((c) => { c.isCorrect = false; });
+      firstMarked.isCorrect = true;
+      const autoFixMessage = `Question ${question.index}: had ${correctCount} marked choices; keeping first marked answer.`;
+      diagnostics.autoFixes.push(autoFixMessage);
+      console.warn(`AUTO-FIX: (permissive) ${autoFixMessage} "${firstMarked.text}"`);
+
+      // Recompute markedChoices/correctCount for downstream validation
+      markedChoices = question.choices.filter((choice) => choice.isCorrect);
+      correctCount = markedChoices.length;
     }
 
     if (correctCount !== 1) {
-      throw new Error(`Question ${question.index} must have exactly 1 correct choice. Use [x] or {{ANS}} once.`);
+      if (options.permissive) {
+        if (correctCount === 0 && question.choices.length > 0) {
+          question.choices[0].isCorrect = true;
+          const autoFixMessage = `Question ${question.index}: had no marked choices; defaulting to first choice.`;
+          diagnostics.autoFixes.push(autoFixMessage);
+          console.warn(`AUTO-FIX: (permissive) ${autoFixMessage} "${question.choices[0].text}"`);
+        } else if (correctCount > 1) {
+          const firstMarked = markedChoices[0];
+          question.choices.forEach((c) => { c.isCorrect = false; });
+          firstMarked.isCorrect = true;
+          const autoFixMessage = `Question ${question.index}: had ${correctCount} marked choices; keeping first marked answer.`;
+          diagnostics.autoFixes.push(autoFixMessage);
+          console.warn(`AUTO-FIX: (permissive) ${autoFixMessage} "${firstMarked.text}"`);
+        }
+        // recompute
+        markedChoices = question.choices.filter((choice) => choice.isCorrect);
+        correctCount = markedChoices.length;
+        if (correctCount !== 1) {
+          throw new Error(`Question ${question.index} must have exactly 1 correct choice. Use [x] or {{ANS}} once.`);
+        }
+      } else {
+        throw new Error(`Question ${question.index} must have exactly 1 correct choice. Use [x] or {{ANS}} once.`);
+      }
     }
 
     question.choices = question.choices.map(({ text, isCorrect }) => ({ text, isCorrect }));
@@ -450,7 +619,49 @@ function parseQuestionBankFromLines(lines) {
     throw new Error('No questions were parsed. Check the input format.');
   }
 
-  return { title, questions };
+  return { title, questions, diagnostics };
+}
+
+function parseQuestionBankSimple(lines, options = {}) {
+  const questions = [];
+  let current = null;
+  let qIndex = 0;
+  const diagnostics = options.diagnostics || {
+    warnings: [],
+    autoFixes: [],
+    usedFlattenedFallback: false
+  };
+
+  const isStemLine = (l) => String(l || '').trim().endsWith('?');
+
+  for (const raw of lines) {
+    const line = String(raw || '').replace(/\u00A0/g, ' ').trim();
+    if (!line) continue;
+
+    if (isStemLine(line)) {
+      if (current) questions.push(current);
+      qIndex += 1;
+      current = { index: qIndex, stem: line, pointsPossible: null, choices: [] };
+      continue;
+    }
+
+    // treat as a choice if we have a current stem
+    if (current) {
+      const parsed = extractAnswerMarker(line);
+      const checkboxMatch = line.match(/^\s*\[(x| )\]\s*/i);
+      const checkboxMarked = Boolean(checkboxMatch && checkboxMatch[1].toLowerCase() === 'x');
+      current.choices.push({ text: parsed.cleanedText, isCorrect: checkboxMarked || parsed.hasAnswerMarker, markedBy: checkboxMarked ? 'checkbox' : (parsed.hasAnswerMarker ? 'ans-marker' : 'none') });
+      continue;
+    }
+
+    // otherwise ignore
+  }
+
+  if (current) questions.push(current);
+
+  if (!questions.length) throw new Error('No questions were parsed. Check the input format.');
+
+  return { title: 'Word QTI Assessment', questions, diagnostics };
 }
 
 function createAssessmentXml(assessmentId, title, questions) {
@@ -491,7 +702,7 @@ function createAssessmentXml(assessmentId, title, questions) {
             </qtimetadatafield>
             <qtimetadatafield>
               <fieldlabel>points_possible</fieldlabel>
-              <fieldentry>${question.pointsPossible.toFixed(1)}</fieldentry>
+              <fieldentry>${(Number(question.pointsPossible ?? 1)).toFixed(1)}</fieldentry>
             </qtimetadatafield>
             <qtimetadatafield>
               <fieldlabel>original_answer_ids</fieldlabel>
@@ -644,33 +855,38 @@ export function isXmlWellFormed(xmlText) {
 }
 
 export async function generateQtiPackageArtifacts(rawInputText, options = {}) {
-  const { title, questions } = parseQuestionBank(rawInputText);
+  const parsed = options.parsed || parseQuestionBank(rawInputText, options);
+  const { title, questions } = parsed;
   const hash = await shortStableHash(`${title}:${questions.length}`);
   const assessmentId = `word_qti_assessment_${hash}`;
   const folderName = assessmentId;
   const dateIso = new Date().toISOString().slice(0, 10);
+  const skipZipData = Boolean(options.skipZipData);
 
   const assessmentXml = createAssessmentXml(assessmentId, title, questions);
   const manifestXml = createManifestXml(assessmentId, folderName, dateIso);
   const assessmentMetaXml = createAssessmentMetaXml(title, dateIso);
 
-  const zip = new JSZip();
-  zip.file('imsmanifest.xml', manifestXml);
-  zip.file(`${folderName}/${assessmentId}.xml`, assessmentXml);
-  zip.file(`${folderName}/assessment_meta.xml`, assessmentMetaXml);
+  let zipData = null;
+  if (!skipZipData) {
+    const zip = new JSZip();
+    zip.file('imsmanifest.xml', manifestXml);
+    zip.file(`${folderName}/${assessmentId}.xml`, assessmentXml);
+    zip.file(`${folderName}/assessment_meta.xml`, assessmentMetaXml);
 
-  if (options.debugInfo?.enabled) {
-    const debugLines = [
-      `source=${options.debugInfo.source || 'unknown'}`,
-      `equationCount=${options.debugInfo.equationCount ?? 0}`,
-      '--- parser input ---',
-      options.debugInfo.rawText || ''
-    ];
+    if (options.debugInfo?.enabled) {
+      const debugLines = [
+        `source=${options.debugInfo.source || 'unknown'}`,
+        `equationCount=${options.debugInfo.equationCount ?? 0}`,
+        '--- parser input ---',
+        options.debugInfo.rawText || ''
+      ];
 
-    zip.file('debug/extraction.txt', debugLines.join('\n'));
+      zip.file('debug/extraction.txt', debugLines.join('\n'));
+    }
+
+    zipData = await zip.generateAsync({ type: 'uint8array' });
   }
-
-  const zipData = await zip.generateAsync({ type: 'uint8array' });
 
   return {
     title,
@@ -684,11 +900,11 @@ export async function generateQtiPackageArtifacts(rawInputText, options = {}) {
   };
 }
 
-export async function generateQtiZipBuffer(rawInputText) {
-  const artifacts = await generateQtiPackageArtifacts(rawInputText);
+export async function generateQtiZipBuffer(rawInputText, options = {}) {
+  const artifacts = await generateQtiPackageArtifacts(rawInputText, options);
   return artifacts.zipData;
 }
 
-export function parseForValidation(rawInputText) {
-  return parseQuestionBank(rawInputText);
+export function parseForValidation(rawInputText, options = {}) {
+  return parseQuestionBank(rawInputText, options);
 }

@@ -84,3 +84,78 @@ button[disabled] {
   background: #fef2f2;
   color: #b91c1c;
 }
+
+.check-results {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.check-results-summary {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.4;
+  color: #111827;
+  font-weight: 600;
+}
+
+.check-results-meta {
+  margin-top: 8px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: #374151;
+}
+
+.check-results-meta.warning {
+  color: #92400e;
+}
+
+.check-results-issues {
+  margin: 10px 0 0;
+  padding-left: 18px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: #1f2937;
+}
+
+.check-results-issues:empty {
+  display: none;
+}
+
+.check-results.results-pass .check-results-issues {
+  color: #92400e;
+}
+
+.check-results.results-error .check-results-issues {
+  color: #7f1d1d;
+}
+
+.check-results-actions {
+  margin-top: 10px;
+}
+
+.small-button {
+  width: auto;
+  margin-bottom: 0;
+  padding: 6px 10px;
+  font-size: 12px;
+  border-radius: 8px;
+}
+
+.check-results-preview {
+  margin: 10px 0 0;
+  padding: 8px;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  background: #f8fafc;
+  color: #1f2937;
+  font-size: 11px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+}
+
+.check-results-preview:empty {
+  display: none;
+}

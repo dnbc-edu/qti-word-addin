@@ -4,7 +4,15 @@ const checkButton = document.getElementById('checkButton');
 const generateButton = document.getElementById('generateButton');
 const statusNode = document.getElementById('status');
 const strictModeToggle = document.getElementById('strictModeToggle');
-const APP_VERSION = '2026.04.15-final14';
+const parserPermissiveToggle = document.getElementById('parserPermissiveToggle');
+const checkResultsNode = document.getElementById('checkResults');
+const checkResultsSummaryNode = document.getElementById('checkResultsSummary');
+const checkResultsMetaNode = document.getElementById('checkResultsMeta');
+const checkResultsIssuesNode = document.getElementById('checkResultsIssues');
+const checkResultsPreviewNode = document.getElementById('checkResultsPreview');
+const copyCheckReportButton = document.getElementById('copyCheckReportButton');
+const APP_VERSION = '2026.04.24-final15';
+let latestCheckReportText = '';
 
 const WORD_NS = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
 const MATH_NS = 'http://schemas.openxmlformats.org/officeDocument/2006/math';
@@ -23,6 +31,220 @@ function setStatus(message) {
   if (normalizedMessage.startsWith('check passed') || normalizedMessage.startsWith('done')) {
     statusNode.classList.add('status-success');
   }
+}
+
+function clearCheckResults() {
+  if (checkResultsSummaryNode) {
+    checkResultsSummaryNode.textContent = '';
+  }
+
+  if (checkResultsMetaNode) {
+    checkResultsMetaNode.textContent = '';
+  }
+
+  if (checkResultsIssuesNode) {
+    checkResultsIssuesNode.innerHTML = '';
+  }
+
+  if (checkResultsPreviewNode) {
+    checkResultsPreviewNode.textContent = '';
+  }
+
+  if (copyCheckReportButton) {
+    copyCheckReportButton.disabled = true;
+  }
+
+  latestCheckReportText = '';
+
+  if (checkResultsNode) {
+    checkResultsNode.hidden = true;
+    checkResultsNode.classList.remove('results-pass', 'results-error');
+  }
+}
+
+function getIssueHint(issue) {
+  const text = String(issue || '').toLowerCase();
+
+  if (text.includes('must have at least 2 choices')) {
+    return 'Ensure each question has at least two choice lines.';
+  }
+
+  if (text.includes('must have exactly 1 correct choice')) {
+    return 'Mark exactly one choice as correct using [x] or {{ANS}}.';
+  }
+
+  if (text.includes('multiple correct choices')) {
+    return 'Keep only one correct marker for each question.';
+  }
+
+  if (text.includes('no questions were parsed')) {
+    return 'Use numbered stems or stems ending with ? or :, with choices on separate lines.';
+  }
+
+  if (text.includes('not well-formed')) {
+    return 'Re-run in strict XML mode to pinpoint file-level XML issues.';
+  }
+
+  return '';
+}
+
+function annotateIssuesWithHints(issues) {
+  return (issues || []).map((issue) => {
+    if (/^Auto-fix applied:/i.test(issue)) {
+      return issue;
+    }
+
+    const hint = getIssueHint(issue);
+    return hint ? `${issue} Hint: ${hint}` : issue;
+  });
+}
+
+function buildQuestionPreviewText(questions, limit = 3) {
+  const items = Array.isArray(questions) ? questions : [];
+  if (items.length === 0) {
+    return '';
+  }
+
+  const shown = items.slice(0, limit);
+  const lines = [`Preview: first ${shown.length} of ${items.length} parsed question(s)`];
+
+  for (const question of shown) {
+    lines.push(`Q${question.index}: ${question.stem}`);
+    for (const choice of question.choices || []) {
+      lines.push(`  ${choice.isCorrect ? '[x]' : '[ ]'} ${choice.text}`);
+    }
+  }
+
+  return lines.join('\n');
+}
+
+function buildCheckReportText(result) {
+  const lines = [
+    `QTI Check Report v${APP_VERSION}`,
+    `Generated: ${new Date().toISOString()}`,
+    `Outcome: ${result.outcome || 'unknown'}`,
+    `Summary: ${result.summary || ''}`,
+    `Questions parsed: ${result.questionCount ?? 0}`,
+    `Issues found: ${Array.isArray(result.issues) ? result.issues.length : 0}`,
+    `Warnings: ${result.warningCount ?? 0}`,
+    `Auto-fixes: ${result.autoFixCount ?? 0}`,
+    `Parser mode: ${result.parserMode || 'strict'}`,
+    `XML check mode: ${result.xmlMode || 'assessment-only'}`,
+    `Extraction source: ${result.source || 'unknown'}`,
+    `Flattened fallback: ${result.usedFlattenedFallback ? 'yes' : 'no'}`,
+    `Equation placeholders: ${result.equationCount ?? 0}`
+  ];
+
+  if (Array.isArray(result.issues) && result.issues.length > 0) {
+    lines.push('Issues:');
+    for (const issue of result.issues) {
+      lines.push(`- ${issue}`);
+    }
+  }
+
+  if (result.previewText) {
+    lines.push('');
+    lines.push(result.previewText);
+  }
+
+  return lines.join('\n');
+}
+
+async function copyLatestCheckReport() {
+  if (!latestCheckReportText) {
+    setStatus('Error: No check report available to copy yet.');
+    return;
+  }
+
+  try {
+    let copied = false;
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(latestCheckReportText);
+      copied = true;
+    } else {
+      const tempTextArea = document.createElement('textarea');
+      tempTextArea.value = latestCheckReportText;
+      document.body.appendChild(tempTextArea);
+      tempTextArea.select();
+      copied = Boolean(document.execCommand('copy'));
+      document.body.removeChild(tempTextArea);
+    }
+
+    if (!copied) {
+      throw new Error('Copy command was rejected by host runtime.');
+    }
+
+    setStatus('Check report copied to clipboard.');
+  } catch {
+    setStatus('Error: Unable to copy report to clipboard in this environment.');
+  }
+}
+
+function parseIssuesFromErrorMessage(message) {
+  const text = String(message || '').trim();
+  if (!text) {
+    return ['Unknown validation error.'];
+  }
+
+  const matches = text.match(/Question\s+\d+[^.]*\.?/gi) || [];
+  if (matches.length > 0) {
+    return [...new Set(matches.map((entry) => entry.trim()))];
+  }
+
+  const parts = text
+    .split(/[;\n]/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+
+  return parts.length > 0 ? parts : [text];
+}
+
+function renderCheckResults(result) {
+  if (!checkResultsNode || !checkResultsSummaryNode || !checkResultsMetaNode || !checkResultsIssuesNode) {
+    return;
+  }
+
+  const issueCount = Array.isArray(result.issues) ? result.issues.length : 0;
+  const warningCount = result.warningCount ?? 0;
+  const autoFixCount = result.autoFixCount ?? 0;
+  checkResultsNode.classList.remove('results-pass', 'results-error');
+  checkResultsNode.classList.add(result.outcome === 'error' ? 'results-error' : 'results-pass');
+  checkResultsSummaryNode.textContent = result.summary || 'Check completed.';
+
+  const metaLines = [
+    `Outcome: ${result.outcome || 'unknown'}`,
+    `Questions parsed: ${result.questionCount ?? 0}`,
+    `Issues found: ${issueCount}`,
+    `Warnings: ${warningCount}`,
+    `Auto-fixes: ${autoFixCount}`,
+    `Parser mode: ${result.parserMode || 'strict'}`,
+    `XML check mode: ${result.xmlMode || 'assessment-only'}`,
+    `Extraction source: ${result.source || 'unknown'}`,
+    `Flattened fallback: ${result.usedFlattenedFallback ? 'yes' : 'no'}`,
+    `Equation placeholders: ${result.equationCount ?? 0}`
+  ];
+  checkResultsMetaNode.textContent = metaLines.join(' | ');
+  checkResultsMetaNode.classList.toggle('warning', warningCount > 0 || autoFixCount > 0);
+
+  checkResultsIssuesNode.innerHTML = '';
+  if (issueCount > 0) {
+    for (const issue of result.issues) {
+      const item = document.createElement('li');
+      item.textContent = issue;
+      checkResultsIssuesNode.appendChild(item);
+    }
+  }
+
+  if (checkResultsPreviewNode) {
+    checkResultsPreviewNode.textContent = result.previewText || '';
+  }
+
+  latestCheckReportText = buildCheckReportText(result);
+  if (copyCheckReportButton) {
+    copyCheckReportButton.disabled = !latestCheckReportText;
+  }
+
+  checkResultsNode.hidden = false;
 }
 
 function toSafeFilename(value) {
@@ -681,9 +903,13 @@ function validateXmlArtifacts(artifacts, strictModeEnabled) {
 
 async function handleGenerate() {
   setActionButtonsDisabled(true);
+  clearCheckResults();
 
   try {
-    const { parsed, artifacts, strictModeEnabled, equationCount, source } = await runPreflightChecks();
+    const { parsed, artifacts, strictModeEnabled, equationCount, source } = await runPreflightChecks({
+      includeZipData: true,
+      includeDebugInfo: true
+    });
     validateXmlArtifacts(artifacts, strictModeEnabled);
 
     const filename = buildExportFilename(parsed.title);
@@ -698,10 +924,30 @@ async function handleGenerate() {
   }
 }
 
-async function runPreflightChecks() {
+async function runPreflightChecks(options = {}) {
+  const includeZipData = options.includeZipData !== false;
+  const includeDebugInfo = Boolean(options.includeDebugInfo);
+
   setStatus('Reading document...');
   const { rawText, source, ooxml } = await getDocumentParserText();
   const equationCount = countEquationPlaceholders(rawText);
+  const parserPermissiveEnabled = Boolean(parserPermissiveToggle?.checked);
+  const parserMode = parserPermissiveEnabled ? 'permissive' : 'strict';
+  const parserDiagnostics = {
+    warnings: [],
+    autoFixes: [],
+    usedFlattenedFallback: false
+  };
+
+  const strictModeEnabled = Boolean(strictModeToggle?.checked);
+  const xmlMode = strictModeEnabled ? 'strict-all-xml' : 'assessment-only';
+  const preflightContext = {
+    equationCount,
+    source,
+    parserMode,
+    xmlMode,
+    parserDiagnostics
+  };
 
   setStatus(
     source === 'text'
@@ -709,42 +955,123 @@ async function runPreflightChecks() {
       : `Detected ${equationCount} equation placeholder(s) via ${source}.`
   );
 
-  setStatus('Validating questions...');
-  const parsed = parseForValidation(rawText);
+  setStatus(`Validating questions (${parserMode} parser)...`);
+  let parsed;
+  try {
+    parsed = parseForValidation(rawText, {
+      permissive: parserPermissiveEnabled,
+      diagnostics: parserDiagnostics
+    });
+  } catch (error) {
+    error.preflightContext = preflightContext;
+    throw error;
+  }
 
   setStatus(`Generating package for ${parsed.questions.length} question(s)...`);
-  const debugRawText = (source && source.startsWith('ooxml')) ? (ooxml || rawText) : rawText;
-  const artifacts = await generateQtiPackageArtifacts(rawText, {
-    debugInfo: {
-      enabled: true,
-      source,
-      equationCount,
-      rawText: debugRawText
-    }
-  });
+  let artifacts;
+  try {
+    const debugRawText = (source && source.startsWith('ooxml')) ? (ooxml || rawText) : rawText;
+    artifacts = await generateQtiPackageArtifacts(rawText, {
+      parsed,
+      skipZipData: !includeZipData,
+      debugInfo: includeDebugInfo
+        ? {
+          enabled: true,
+          source,
+          equationCount,
+          rawText: debugRawText
+        }
+        : undefined
+    });
+  } catch (error) {
+    error.preflightContext = preflightContext;
+    throw error;
+  }
 
-  const strictModeEnabled = Boolean(strictModeToggle?.checked);
   setStatus(
     strictModeEnabled
       ? 'Strict mode enabled: checking all generated XML files...'
       : 'Checking generated assessment XML...'
   );
 
-  return { parsed, artifacts, strictModeEnabled, equationCount, source };
+  return {
+    parsed,
+    artifacts,
+    strictModeEnabled,
+    equationCount,
+    source,
+    parserMode,
+    xmlMode,
+    parserDiagnostics
+  };
 }
 
 async function handleCheckQuestions() {
   setActionButtonsDisabled(true);
+  clearCheckResults();
 
   try {
-    const { parsed, artifacts, strictModeEnabled, equationCount, source } = await runPreflightChecks();
+    const {
+      parsed,
+      artifacts,
+      strictModeEnabled,
+      equationCount,
+      source,
+      parserMode,
+      xmlMode,
+      parserDiagnostics
+    } = await runPreflightChecks({ includeZipData: false, includeDebugInfo: false });
     validateXmlArtifacts(artifacts, strictModeEnabled);
+
+    renderCheckResults({
+      outcome: 'pass',
+      summary: parserDiagnostics.autoFixes.length > 0
+        ? 'Check passed with auto-fixes. Review adjustments below before generating ZIP.'
+        : 'Check passed. Questions are ready for QTI ZIP generation.',
+      issues: annotateIssuesWithHints([
+        ...parserDiagnostics.warnings.map((item) => `Warning: ${item}`),
+        ...parserDiagnostics.autoFixes.map((item) => `Auto-fix applied: ${item}`)
+      ]),
+      questionCount: parsed.questions.length,
+      warningCount: parserDiagnostics.warnings.length,
+      autoFixCount: parserDiagnostics.autoFixes.length,
+      parserMode,
+      xmlMode,
+      source,
+      equationCount,
+      usedFlattenedFallback: Boolean(parserDiagnostics.usedFlattenedFallback),
+      previewText: buildQuestionPreviewText(parsed.questions)
+    });
 
     setStatus(
       `Check passed (v${APP_VERSION}). ${parsed.questions.length} question(s) are ready for QTI ZIP generation (equations detected: ${equationCount}, source: ${source}).`
     );
   } catch (error) {
-    setStatus(`Error: ${error?.message || 'Unknown error'}`);
+    const errorMessage = error?.message || 'Unknown error';
+    const preflightContext = error?.preflightContext || {};
+    const parserDiagnostics = preflightContext.parserDiagnostics || { warnings: [], autoFixes: [], usedFlattenedFallback: false };
+    const issues = annotateIssuesWithHints([
+      ...parseIssuesFromErrorMessage(errorMessage),
+      ...parserDiagnostics.warnings.map((item) => `Warning: ${item}`),
+      ...parserDiagnostics.autoFixes.map((item) => `Auto-fix applied: ${item}`)
+    ]);
+
+    renderCheckResults({
+      outcome: 'error',
+      summary: 'Check failed. Review the detected issues below.',
+      issues,
+      questionCount: 0,
+      warningCount: parserDiagnostics.warnings.length,
+      autoFixCount: parserDiagnostics.autoFixes.length,
+      parserMode: preflightContext.parserMode || 'strict',
+      xmlMode: preflightContext.xmlMode || (Boolean(strictModeToggle?.checked) ? 'strict-all-xml' : 'assessment-only'),
+      source: preflightContext.source || 'unknown',
+      equationCount: preflightContext.equationCount ?? 0,
+      usedFlattenedFallback: Boolean(parserDiagnostics.usedFlattenedFallback),
+      previewText: ''
+    });
+
+    setStatus(`Error: ${errorMessage}`);
   } finally {
     setActionButtonsDisabled(false);
   }
@@ -760,4 +1087,5 @@ Office.onReady((info) => {
   setStatus(`Ready (v${APP_VERSION}). Click “Check Questions” or “Generate QTI ZIP”.`);
   checkButton.addEventListener('click', handleCheckQuestions);
   generateButton.addEventListener('click', handleGenerate);
+  copyCheckReportButton?.addEventListener('click', copyLatestCheckReport);
 });

@@ -1,7 +1,25 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import JSZip from 'jszip';
-import { generateQtiZipBuffer, parseForValidation } from '../src/qti-generator.js';
+// Dynamically load the generator module to be robust across CommonJS/ESM runtimes
+let generateQtiZipBuffer;
+let parseForValidation;
+async function loadQtiGenerator() {
+  try {
+    const mod = await import('../src/qti-generator.js');
+    return mod;
+  } catch (err) {
+    // Fallback: attempt to load via CommonJS require() when possible
+    try {
+      const { createRequire } = await import('module');
+      const require = createRequire(import.meta.url);
+      // eslint-disable-next-line global-require, import/no-dynamic-require
+      return require('../src/qti-generator.js');
+    } catch (err2) {
+      throw err;
+    }
+  }
+}
 
 // Use mammoth to get more faithful text extraction (including lists)
 let mammoth;
@@ -29,11 +47,24 @@ function parseArgs(argv) {
       options.output = argv[index + 1];
       index += 1;
     }
+    if (token === '--write-extracted') {
+      options.writeExtracted = true;
+    }
+    if (token === '--permissive') {
+      options.permissive = true;
+    }
+    if (token === '--debug-parse') {
+      options.debugParse = true;
+    }
   }
   return options;
 }
 
 async function main() {
+  const qti = await loadQtiGenerator();
+  generateQtiZipBuffer = qti.generateQtiZipBuffer || qti.default?.generateQtiZipBuffer;
+  parseForValidation = qti.parseForValidation || qti.default?.parseForValidation;
+
   const args = parseArgs(process.argv.slice(2));
   if (!args.input || !args.output) {
     throw new Error('Usage: node scripts/generate-qti.js --input <path> --output <path>');
@@ -42,12 +73,17 @@ async function main() {
   const ext = path.extname(args.input || '').toLowerCase();
   if (ext === '.docx') {
     const buffer = await fs.readFile(args.input);
-    inputText = await extractTextFromDocx(buffer);
+    inputText = await extractTextFromDocx(buffer, { writeExtracted: Boolean(args.writeExtracted) });
   } else {
     inputText = await fs.readFile(args.input, 'utf8');
   }
-  const parsed = parseForValidation(inputText);
-  const zipBuffer = await generateQtiZipBuffer(inputText);
+  const parseOptions = {
+    permissive: Boolean(args.permissive),
+    debugParse: Boolean(args.debugParse)
+  };
+
+  const parsed = parseForValidation(inputText, parseOptions);
+  const zipBuffer = await generateQtiZipBuffer(inputText, parseOptions);
 
   await fs.mkdir(path.dirname(args.output), { recursive: true });
   await fs.writeFile(args.output, zipBuffer);
@@ -57,7 +93,7 @@ async function main() {
   console.log(`Questions: ${parsed.questions.length}`);
 }
 
-async function extractTextFromDocx(buffer) {
+async function extractTextFromDocx(buffer, options = {}) {
   // Try mammoth first; if it produces numbered lines, use that.
   // Prefer XML-based extraction below so we can reconstruct numbering and OMML math.
   // Mammoth is available as a helper, but its output may drop or alter equations.
@@ -249,10 +285,12 @@ async function extractTextFromDocx(buffer) {
   }
 
   const extractedText = lines.join('\n\n').trim();
-  try {
-    await fs.writeFile(path.join(process.cwd(), 'tests', 'doc_extracted.txt'), extractedText, 'utf8');
-  } catch (e) {
-    // ignore write errors
+  if (options.writeExtracted) {
+    try {
+      await fs.writeFile(path.join(process.cwd(), 'tests', 'doc_extracted.txt'), extractedText, 'utf8');
+    } catch (e) {
+      // ignore write errors
+    }
   }
 
   return extractedText;
