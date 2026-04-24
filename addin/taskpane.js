@@ -7,12 +7,19 @@ const strictModeToggle = document.getElementById('strictModeToggle');
 const parserPermissiveToggle = document.getElementById('parserPermissiveToggle');
 const checkResultsNode = document.getElementById('checkResults');
 const checkResultsSummaryNode = document.getElementById('checkResultsSummary');
+const checkResultsConfidenceNode = document.getElementById('checkResultsConfidence');
 const checkResultsMetaNode = document.getElementById('checkResultsMeta');
+const checkResultsQuestionJumpsNode = document.getElementById('checkResultsQuestionJumps');
 const checkResultsIssuesNode = document.getElementById('checkResultsIssues');
 const checkResultsPreviewNode = document.getElementById('checkResultsPreview');
 const copyCheckReportButton = document.getElementById('copyCheckReportButton');
+const downloadCheckReportButton = document.getElementById('downloadCheckReportButton');
+const togglePreviewSizeButton = document.getElementById('togglePreviewSizeButton');
 const APP_VERSION = '2026.04.24-final15';
 let latestCheckReportText = '';
+let latestCheckReportData = null;
+let latestRenderedResult = null;
+let previewShowAll = false;
 
 const WORD_NS = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
 const MATH_NS = 'http://schemas.openxmlformats.org/officeDocument/2006/math';
@@ -38,8 +45,17 @@ function clearCheckResults() {
     checkResultsSummaryNode.textContent = '';
   }
 
+  if (checkResultsConfidenceNode) {
+    checkResultsConfidenceNode.textContent = '';
+    checkResultsConfidenceNode.classList.remove('high', 'medium', 'low');
+  }
+
   if (checkResultsMetaNode) {
     checkResultsMetaNode.textContent = '';
+  }
+
+  if (checkResultsQuestionJumpsNode) {
+    checkResultsQuestionJumpsNode.innerHTML = '';
   }
 
   if (checkResultsIssuesNode) {
@@ -47,18 +63,177 @@ function clearCheckResults() {
   }
 
   if (checkResultsPreviewNode) {
-    checkResultsPreviewNode.textContent = '';
+    checkResultsPreviewNode.innerHTML = '';
   }
 
   if (copyCheckReportButton) {
     copyCheckReportButton.disabled = true;
   }
 
+  if (downloadCheckReportButton) {
+    downloadCheckReportButton.disabled = true;
+  }
+
+  if (togglePreviewSizeButton) {
+    togglePreviewSizeButton.disabled = true;
+    togglePreviewSizeButton.classList.remove('active');
+    togglePreviewSizeButton.textContent = 'Show All';
+  }
+
   latestCheckReportText = '';
+  latestCheckReportData = null;
+  latestRenderedResult = null;
+  previewShowAll = false;
 
   if (checkResultsNode) {
     checkResultsNode.hidden = true;
     checkResultsNode.classList.remove('results-pass', 'results-error');
+  }
+}
+
+function getIssueSeverity(issue) {
+  const text = String(issue || '').toLowerCase();
+  if (text.startsWith('warning:')) return 'warning';
+  if (text.startsWith('auto-fix applied:')) return 'autofix';
+  return 'error';
+}
+
+function getSeverityPriority(severity) {
+  if (severity === 'error') return 3;
+  if (severity === 'warning') return 2;
+  if (severity === 'autofix') return 1;
+  return 0;
+}
+
+function buildQuestionSeverityMap(issues) {
+  const questionSeverityMap = new Map();
+  for (const issue of issues || []) {
+    const severity = getIssueSeverity(issue);
+    const matches = String(issue).matchAll(/Question\s+(\d+)/gi);
+    for (const match of matches) {
+      const questionId = Number(match[1]);
+      if (!Number.isFinite(questionId) || questionId <= 0) {
+        continue;
+      }
+
+      const current = questionSeverityMap.get(questionId);
+      if (!current || getSeverityPriority(severity) > getSeverityPriority(current)) {
+        questionSeverityMap.set(questionId, severity);
+      }
+    }
+  }
+
+  return questionSeverityMap;
+}
+
+function computeConfidence(result) {
+  const issueCount = Array.isArray(result.issues) ? result.issues.length : 0;
+  const warningCount = result.warningCount ?? 0;
+  const autoFixCount = result.autoFixCount ?? 0;
+
+  let score = 100;
+  score -= issueCount * 18;
+  score -= warningCount * 8;
+  score -= autoFixCount * 10;
+  if (result.usedFlattenedFallback) score -= 10;
+  if (result.source === 'text') score -= 8;
+  if (result.parserMode === 'permissive') score -= 5;
+  if (result.outcome === 'error') score -= 20;
+
+  score = Math.max(0, Math.min(100, score));
+
+  if (score >= 85) {
+    return { score, label: 'High', className: 'high' };
+  }
+
+  if (score >= 65) {
+    return { score, label: 'Medium', className: 'medium' };
+  }
+
+  return { score, label: 'Low', className: 'low' };
+}
+
+function renderQuestionPreview(questions, showAll = false) {
+  if (!checkResultsPreviewNode) {
+    return new Set();
+  }
+
+  checkResultsPreviewNode.innerHTML = '';
+  const includedQuestionIds = new Set();
+
+  const allQuestions = Array.isArray(questions) ? questions : [];
+  const previewLimit = showAll ? allQuestions.length : 20;
+  const items = allQuestions.slice(0, previewLimit);
+  for (const question of items) {
+    includedQuestionIds.add(question.index);
+
+    const questionNode = document.createElement('div');
+    questionNode.className = 'preview-question';
+    questionNode.id = `preview-q-${question.index}`;
+
+    const stemNode = document.createElement('div');
+    stemNode.className = 'preview-stem';
+    stemNode.textContent = `Q${question.index}: ${question.stem}`;
+    questionNode.appendChild(stemNode);
+
+    const choicesNode = document.createElement('ul');
+    choicesNode.className = 'preview-choices';
+    for (const choice of question.choices || []) {
+      const choiceNode = document.createElement('li');
+      choiceNode.textContent = `${choice.isCorrect ? '[x]' : '[ ]'} ${choice.text}`;
+      choicesNode.appendChild(choiceNode);
+    }
+
+    questionNode.appendChild(choicesNode);
+    checkResultsPreviewNode.appendChild(questionNode);
+  }
+
+  return includedQuestionIds;
+}
+
+function scrollPreviewToQuestion(questionNumber) {
+  const target = document.getElementById(`preview-q-${questionNumber}`);
+  if (!target) {
+    setStatus(`Error: Q${questionNumber} is not in the current preview range.`);
+    return;
+  }
+
+  const activeNodes = checkResultsPreviewNode?.querySelectorAll('.preview-question.active') || [];
+  for (const node of activeNodes) {
+    node.classList.remove('active');
+  }
+
+  target.classList.add('active');
+  target.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function renderQuestionJumps(questionSeverityMap, includedPreviewIds) {
+  if (!checkResultsQuestionJumpsNode) {
+    return;
+  }
+
+  checkResultsQuestionJumpsNode.innerHTML = '';
+  const questionIds = Array.from(questionSeverityMap.keys()).sort((left, right) => left - right);
+  for (const questionId of questionIds) {
+    const severity = questionSeverityMap.get(questionId) || 'error';
+    const chip = document.createElement('button');
+    chip.type = 'button';
+    chip.className = `jump-chip ${severity}`;
+    chip.textContent = `Q${questionId}`;
+    chip.title = includedPreviewIds.has(questionId)
+      ? `Jump to Q${questionId} in preview (${severity})`
+      : `Q${questionId} is outside current preview range (${severity})`;
+
+    chip.addEventListener('click', () => {
+      const activeChips = checkResultsQuestionJumpsNode.querySelectorAll('.jump-chip.active');
+      for (const active of activeChips) {
+        active.classList.remove('active');
+      }
+      chip.classList.add('active');
+      scrollPreviewToQuestion(questionId);
+    });
+
+    checkResultsQuestionJumpsNode.appendChild(chip);
   }
 }
 
@@ -119,10 +294,12 @@ function buildQuestionPreviewText(questions, limit = 3) {
 }
 
 function buildCheckReportText(result) {
+  const confidence = result.confidence || computeConfidence(result);
   const lines = [
     `QTI Check Report v${APP_VERSION}`,
     `Generated: ${new Date().toISOString()}`,
     `Outcome: ${result.outcome || 'unknown'}`,
+    `Confidence: ${confidence.label} (${confidence.score}/100)`,
     `Summary: ${result.summary || ''}`,
     `Questions parsed: ${result.questionCount ?? 0}`,
     `Issues found: ${Array.isArray(result.issues) ? result.issues.length : 0}`,
@@ -131,6 +308,7 @@ function buildCheckReportText(result) {
     `Parser mode: ${result.parserMode || 'strict'}`,
     `XML check mode: ${result.xmlMode || 'assessment-only'}`,
     `Extraction source: ${result.source || 'unknown'}`,
+    `Extracted question candidates: ${result.extractedQuestionCount ?? 0}`,
     `Flattened fallback: ${result.usedFlattenedFallback ? 'yes' : 'no'}`,
     `Equation placeholders: ${result.equationCount ?? 0}`
   ];
@@ -148,6 +326,29 @@ function buildCheckReportText(result) {
   }
 
   return lines.join('\n');
+}
+
+function buildCheckReportData(result) {
+  const confidence = result.confidence || computeConfidence(result);
+  return {
+    appVersion: APP_VERSION,
+    generatedAt: new Date().toISOString(),
+    outcome: result.outcome || 'unknown',
+    summary: result.summary || '',
+    confidence,
+    questionCount: result.questionCount ?? 0,
+    issueCount: Array.isArray(result.issues) ? result.issues.length : 0,
+    warningCount: result.warningCount ?? 0,
+    autoFixCount: result.autoFixCount ?? 0,
+    parserMode: result.parserMode || 'strict',
+    xmlMode: result.xmlMode || 'assessment-only',
+    source: result.source || 'unknown',
+    extractedQuestionCount: result.extractedQuestionCount ?? 0,
+    usedFlattenedFallback: Boolean(result.usedFlattenedFallback),
+    equationCount: result.equationCount ?? 0,
+    issues: result.issues || [],
+    preview: result.previewText || ''
+  };
 }
 
 async function copyLatestCheckReport() {
@@ -180,6 +381,45 @@ async function copyLatestCheckReport() {
   }
 }
 
+function downloadLatestCheckReport() {
+  if (!latestCheckReportData) {
+    setStatus('Error: No check report available to download yet.');
+    return;
+  }
+
+  try {
+    const filename = buildExportFilename('qti-check-report').replace(/\.zip$/i, '.json');
+    const blob = new Blob([JSON.stringify(latestCheckReportData, null, 2)], { type: 'application/json' });
+    downloadBlob(blob, filename);
+    setStatus(`Check report JSON downloaded as ${filename}.`);
+  } catch {
+    setStatus('Error: Unable to download JSON report.');
+  }
+}
+
+function togglePreviewSize() {
+  if (!latestRenderedResult) {
+    setStatus('Error: No check result available to expand yet.');
+    return;
+  }
+
+  const previewQuestions = latestRenderedResult.previewQuestions || [];
+  if (previewQuestions.length <= 20) {
+    return;
+  }
+
+  previewShowAll = !previewShowAll;
+
+  const includedPreviewIds = renderQuestionPreview(previewQuestions, previewShowAll);
+  const questionSeverityMap = buildQuestionSeverityMap(latestRenderedResult.issues || []);
+  renderQuestionJumps(questionSeverityMap, includedPreviewIds);
+
+  if (togglePreviewSizeButton) {
+    togglePreviewSizeButton.textContent = previewShowAll ? 'Show Less' : 'Show All';
+    togglePreviewSizeButton.classList.toggle('active', previewShowAll);
+  }
+}
+
 function parseIssuesFromErrorMessage(message) {
   const text = String(message || '').trim();
   if (!text) {
@@ -207,9 +447,23 @@ function renderCheckResults(result) {
   const issueCount = Array.isArray(result.issues) ? result.issues.length : 0;
   const warningCount = result.warningCount ?? 0;
   const autoFixCount = result.autoFixCount ?? 0;
+  const confidence = computeConfidence(result);
+  const questionSeverityMap = buildQuestionSeverityMap(result.issues);
+  const questionIdsFromIssues = Array.from(questionSeverityMap.keys());
+  const extractedQuestionCount = result.extractedQuestionCount ?? 0;
+  const parsedQuestionCount = result.questionCount ?? 0;
+  const countParityLabel = extractedQuestionCount > 0 && parsedQuestionCount > 0
+    ? (Math.abs(extractedQuestionCount - parsedQuestionCount) <= 1 ? 'match' : 'mismatch')
+    : 'unknown';
   checkResultsNode.classList.remove('results-pass', 'results-error');
   checkResultsNode.classList.add(result.outcome === 'error' ? 'results-error' : 'results-pass');
   checkResultsSummaryNode.textContent = result.summary || 'Check completed.';
+
+  if (checkResultsConfidenceNode) {
+    checkResultsConfidenceNode.classList.remove('high', 'medium', 'low');
+    checkResultsConfidenceNode.classList.add(confidence.className);
+    checkResultsConfidenceNode.textContent = `Confidence: ${confidence.label} (${confidence.score}/100)`;
+  }
 
   const metaLines = [
     `Outcome: ${result.outcome || 'unknown'}`,
@@ -220,8 +474,11 @@ function renderCheckResults(result) {
     `Parser mode: ${result.parserMode || 'strict'}`,
     `XML check mode: ${result.xmlMode || 'assessment-only'}`,
     `Extraction source: ${result.source || 'unknown'}`,
+    `Extracted candidates: ${extractedQuestionCount}`,
+    `Count parity: ${countParityLabel}`,
     `Flattened fallback: ${result.usedFlattenedFallback ? 'yes' : 'no'}`,
-    `Equation placeholders: ${result.equationCount ?? 0}`
+    `Equation placeholders: ${result.equationCount ?? 0}`,
+    `Jump targets: ${questionIdsFromIssues.length}`
   ];
   checkResultsMetaNode.textContent = metaLines.join(' | ');
   checkResultsMetaNode.classList.toggle('warning', warningCount > 0 || autoFixCount > 0);
@@ -230,18 +487,40 @@ function renderCheckResults(result) {
   if (issueCount > 0) {
     for (const issue of result.issues) {
       const item = document.createElement('li');
+      item.className = `issue-${getIssueSeverity(issue)}`;
       item.textContent = issue;
       checkResultsIssuesNode.appendChild(item);
     }
   }
 
-  if (checkResultsPreviewNode) {
-    checkResultsPreviewNode.textContent = result.previewText || '';
+  const previewQuestions = result.previewQuestions || [];
+  const includedPreviewIds = renderQuestionPreview(previewQuestions, previewShowAll);
+  renderQuestionJumps(questionSeverityMap, includedPreviewIds);
+
+  if (togglePreviewSizeButton) {
+    const hasExtra = previewQuestions.length > 20;
+    togglePreviewSizeButton.disabled = !hasExtra;
+    togglePreviewSizeButton.textContent = previewShowAll ? 'Show Less' : 'Show All';
+    togglePreviewSizeButton.classList.toggle('active', previewShowAll && hasExtra);
   }
 
-  latestCheckReportText = buildCheckReportText(result);
+  const reportResult = {
+    ...result,
+    confidence,
+    extractedQuestionCount,
+    previewText: result.previewText || buildQuestionPreviewText(result.previewQuestions || [], 20)
+  };
+
+  latestRenderedResult = { ...result };
+
+  latestCheckReportText = buildCheckReportText(reportResult);
+  latestCheckReportData = buildCheckReportData(reportResult);
   if (copyCheckReportButton) {
     copyCheckReportButton.disabled = !latestCheckReportText;
+  }
+
+  if (downloadCheckReportButton) {
+    downloadCheckReportButton.disabled = !latestCheckReportData;
   }
 
   checkResultsNode.hidden = false;
@@ -302,6 +581,17 @@ async function getDocumentHtml() {
 function countEquationPlaceholders(text) {
   const matches = text.match(/\{\{EQ(?::[\s\S]*?)?\}\}(?!\})/g);
   return matches ? matches.length : 0;
+}
+
+function estimateQuestionCandidates(text) {
+  const lines = String(text || '').split(/\r?\n/);
+  let count = 0;
+  for (const line of lines) {
+    if (/^\s*\d+[.)]\s+\S+/.test(line)) {
+      count += 1;
+    }
+  }
+  return count;
 }
 
 function equationNodeToPlaceholder(equationNode) {
@@ -931,6 +1221,7 @@ async function runPreflightChecks(options = {}) {
   setStatus('Reading document...');
   const { rawText, source, ooxml } = await getDocumentParserText();
   const equationCount = countEquationPlaceholders(rawText);
+  const extractedQuestionCount = estimateQuestionCandidates(rawText);
   const parserPermissiveEnabled = Boolean(parserPermissiveToggle?.checked);
   const parserMode = parserPermissiveEnabled ? 'permissive' : 'strict';
   const parserDiagnostics = {
@@ -943,6 +1234,7 @@ async function runPreflightChecks(options = {}) {
   const xmlMode = strictModeEnabled ? 'strict-all-xml' : 'assessment-only';
   const preflightContext = {
     equationCount,
+    extractedQuestionCount,
     source,
     parserMode,
     xmlMode,
@@ -962,6 +1254,15 @@ async function runPreflightChecks(options = {}) {
       permissive: parserPermissiveEnabled,
       diagnostics: parserDiagnostics
     });
+
+    if (extractedQuestionCount > 0) {
+      const difference = Math.abs(extractedQuestionCount - parsed.questions.length);
+      if (difference > 1) {
+        parserDiagnostics.warnings.push(
+          `Question count parity mismatch: extracted ${extractedQuestionCount}, parsed ${parsed.questions.length}.`
+        );
+      }
+    }
   } catch (error) {
     error.preflightContext = preflightContext;
     throw error;
@@ -999,6 +1300,7 @@ async function runPreflightChecks(options = {}) {
     artifacts,
     strictModeEnabled,
     equationCount,
+    extractedQuestionCount,
     source,
     parserMode,
     xmlMode,
@@ -1016,6 +1318,7 @@ async function handleCheckQuestions() {
       artifacts,
       strictModeEnabled,
       equationCount,
+      extractedQuestionCount,
       source,
       parserMode,
       xmlMode,
@@ -1039,8 +1342,9 @@ async function handleCheckQuestions() {
       xmlMode,
       source,
       equationCount,
+      extractedQuestionCount,
       usedFlattenedFallback: Boolean(parserDiagnostics.usedFlattenedFallback),
-      previewText: buildQuestionPreviewText(parsed.questions)
+      previewQuestions: parsed.questions
     });
 
     setStatus(
@@ -1067,8 +1371,9 @@ async function handleCheckQuestions() {
       xmlMode: preflightContext.xmlMode || (Boolean(strictModeToggle?.checked) ? 'strict-all-xml' : 'assessment-only'),
       source: preflightContext.source || 'unknown',
       equationCount: preflightContext.equationCount ?? 0,
+      extractedQuestionCount: preflightContext.extractedQuestionCount ?? 0,
       usedFlattenedFallback: Boolean(parserDiagnostics.usedFlattenedFallback),
-      previewText: ''
+      previewQuestions: []
     });
 
     setStatus(`Error: ${errorMessage}`);
@@ -1088,4 +1393,6 @@ Office.onReady((info) => {
   checkButton.addEventListener('click', handleCheckQuestions);
   generateButton.addEventListener('click', handleGenerate);
   copyCheckReportButton?.addEventListener('click', copyLatestCheckReport);
+  downloadCheckReportButton?.addEventListener('click', downloadLatestCheckReport);
+  togglePreviewSizeButton?.addEventListener('click', togglePreviewSize);
 });
